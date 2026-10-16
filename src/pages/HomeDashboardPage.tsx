@@ -74,6 +74,7 @@ export function HomeDashboardPage() {
   const { toast } = useMockToast();
   const { notifications, unreadCount, error: notificationsError, markAsRead } = useNotifications();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notificationActionError, setNotificationActionError] = useState<string>();
   const notificationAnchorRef = useRef<HTMLDivElement>(null);
 
   const [myCommissions, setMyCommissions] = useState<MyCommission[]>([]);
@@ -239,7 +240,15 @@ export function HomeDashboardPage() {
   };
 
   const handleNotificationClick = async (notification: NotificationRecord) => {
-    if (!notification.is_read) await markAsRead(notification.id);
+    setNotificationActionError(undefined);
+    if (!notification.is_read) {
+      try {
+        await markAsRead(notification.id);
+      } catch (error) {
+        setNotificationActionError(error instanceof Error ? error.message : 'Could not mark notification as read.');
+        return;
+      }
+    }
     setNotificationsOpen(false);
     if (notification.related_route) navigate(notification.related_route);
   };
@@ -274,6 +283,7 @@ export function HomeDashboardPage() {
                   {unreadCount > 0 && <span className="t-xs c-low">{unreadCount} unread</span>}
                 </div>
                 <div className="notification-preview-list">
+                  {notificationActionError && <div className="notification-preview-empty t-xs c-danger" role="alert">{notificationActionError}</div>}
                   {notifications.length === 0 && <div className="notification-preview-empty t-xs c-low">No notifications yet</div>}
                   {notifications.slice(0, 5).map((notification) => (
                     <button
@@ -282,9 +292,17 @@ export function HomeDashboardPage() {
                       key={notification.id}
                       onClick={() => void handleNotificationClick(notification)}
                     >
-                      <Icon name={notification.notification_type === 'message' ? 'chat' : notification.notification_type === 'verification' ? 'shield' : 'bell'} />
+                      {notification.notification_type.startsWith('artwork_') && notification.actor_avatar_data_url ? (
+                        <img className="notification-preview-avatar" src={notification.actor_avatar_data_url} alt="" />
+                      ) : (
+                        <Icon name={notification.notification_type === 'message' ? 'chat' : notification.notification_type === 'verification' ? 'shield' : 'bell'} />
+                      )}
                       <span className="notification-preview-item-copy">
-                        <span className="notification-preview-item-title">{notification.title}</span>
+                        <span className="notification-preview-item-title">
+                          {notification.actor_name && notification.notification_type.startsWith('artwork_')
+                            ? `${notification.actor_name} · ${notification.title}`
+                            : notification.title}
+                        </span>
                         <span className="notification-preview-item-message">{notification.message}</span>
                         <span className="notification-preview-item-time">{relativeNotificationTime(notification.created_at)}</span>
                       </span>

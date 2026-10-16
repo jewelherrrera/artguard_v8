@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { AuthResult, AuthUser, MockAccount, UserRole } from '../types/auth';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { getMyProfile, ensureMyProfile, usernameFromEmail } from '../lib/supabaseData';
+import { validatePasswordField } from '../utils/validators';
 
 const ACCOUNTS_KEY = 'artguard.mockAccounts';
 const SESSION_KEY = 'artguard.session';
@@ -261,6 +262,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [persistSession]);
 
   const signUp = useCallback(async (name: string, email: string, password: string, role: UserRole, dateOfBirth: string) => {
+    const passwordError = validatePasswordField(password);
+    if (passwordError) return { success: false, error: passwordError };
+
     if (!isSupabaseConfigured || !supabase) {
       const result = await mockApi.signUp(name, email, password, role, dateOfBirth);
       if (result.success && result.user) persistSession(result.user);

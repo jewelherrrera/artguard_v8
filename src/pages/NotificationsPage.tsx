@@ -44,6 +44,23 @@ export function NotificationsPage() {
     }
   };
 
+  const handleOpenNotification = async (notification: NotificationRecord) => {
+    if (!notification.related_route || markingId) return;
+    setActionError(undefined);
+    if (!notification.is_read) {
+      setMarkingId(notification.id);
+      try {
+        await markAsRead(notification.id);
+      } catch (markError) {
+        setActionError(markError instanceof Error ? markError.message : 'Could not mark notification as read.');
+        setMarkingId(null);
+        return;
+      }
+      setMarkingId(null);
+    }
+    navigate(notification.related_route);
+  };
+
   const handleMarkAllAsRead = async () => {
     if (markingAll || unreadCount === 0) return;
     setMarkingAll(true);
@@ -111,18 +128,33 @@ export function NotificationsPage() {
         {!loading && !error && notifications.map((notification) => (
           <article className={`card notification-card${notification.is_read ? '' : ' is-unread'}`} key={notification.id}>
             <div className="notification-icon" aria-hidden="true">
-              <Icon name={notificationIcon(notification.notification_type)} />
+              {notification.notification_type.startsWith('artwork_') && notification.actor_avatar_data_url ? (
+                <img src={notification.actor_avatar_data_url} alt="" />
+              ) : (
+                <Icon name={notificationIcon(notification.notification_type)} />
+              )}
             </div>
             <div className="notification-content">
               <div className="row-between gap-10">
-                <div className="t-sm fw-700">{notification.title}</div>
+                <div className="t-sm fw-700 notification-heading">
+                  {notification.actor_name && notification.notification_type.startsWith('artwork_')
+                    ? `${notification.actor_name} · ${notification.title}`
+                    : notification.title}
+                </div>
                 {!notification.is_read && <span className="notification-unread-label">Unread</span>}
               </div>
               <div className="t-sm c-mid notification-message">{notification.message}</div>
               <div className="t-xs c-low">{formatNotificationDate(notification.created_at)}</div>
               <div className="notification-actions">
                 {notification.related_route && (
-                  <button type="button" className="link-sm" onClick={() => navigate(notification.related_route!)}>Open</button>
+                  <button
+                    type="button"
+                    className="link-sm"
+                    onClick={() => void handleOpenNotification(notification)}
+                    disabled={markingId === notification.id}
+                  >
+                    {markingId === notification.id ? 'Opening…' : 'Open'}
+                  </button>
                 )}
                 {!notification.is_read && (
                   <button type="button" className="link-sm" onClick={() => void handleMarkAsRead(notification)} disabled={markingId === notification.id}>

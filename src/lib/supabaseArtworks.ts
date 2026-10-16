@@ -7,12 +7,17 @@ export const ARTWORK_MIME_TYPES = ['image/jpeg', 'image/png'] as const;
 
 export type ArtworkProtectionLevel = 'standard' | 'enhanced' | 'maximum';
 export type ArtworkStatus = 'original_uploaded' | 'processing' | 'ready' | 'failed';
+export const ARTWORK_CATEGORIES = ['Character', 'Chibi', 'Concept Art', 'Portrait', 'Fanart', 'Environment', 'Other'] as const;
+export type ArtworkCategory = (typeof ARTWORK_CATEGORIES)[number];
+export type ArtworkVisibility = 'private' | 'portfolio' | 'discover';
 
 export interface ArtworkRecord {
   id: string;
   owner_id: string;
   title: string;
   description: string | null;
+  category: ArtworkCategory;
+  visibility: ArtworkVisibility;
   original_storage_path: string;
   protected_storage_path: string | null;
   protection_level: ArtworkProtectionLevel;
@@ -33,6 +38,42 @@ export interface PublicArtworkRecord {
   dynamic_cloaking: boolean;
   canvas_tiling: boolean;
   right_click_shield: boolean;
+}
+
+export interface DiscoverArtworkRecord extends PublicArtworkRecord {
+  category: ArtworkCategory;
+  artist_id: string;
+  artist_name: string;
+  artist_username: string;
+  artist_avatar_data_url: string | null;
+}
+
+export interface DiscoverArtwork {
+  record: DiscoverArtworkRecord;
+  previewUrl: string;
+}
+
+export interface DiscoverArtworkEngagement {
+  artwork_id: string;
+  like_count: number;
+  comment_count: number;
+  liked_by_me: boolean;
+}
+
+export interface DiscoverArtworkComment {
+  id: string;
+  artwork_id: string;
+  author_id: string;
+  author_name: string;
+  author_username: string;
+  author_avatar_data_url: string | null;
+  body: string;
+  created_at: string;
+}
+
+export interface DiscoverArtworkLikeResult {
+  like_count: number;
+  liked_by_me: boolean;
 }
 
 export function validateArtworkFile(file: File): string | undefined {
@@ -254,6 +295,7 @@ export async function uploadArtwork(
   ownerId: string,
   file: File,
   protectionLevel: ArtworkProtectionLevel = 'standard',
+  category: ArtworkCategory = 'Other',
 ): Promise<ArtworkRecord> {
   if (!supabase) throw new Error('Secure artwork storage is not configured. Run the Supabase artwork migration first.');
   if (!ownerId) throw new Error('You must be signed in to upload artwork.');
@@ -274,6 +316,8 @@ export async function uploadArtwork(
     .insert({
       owner_id: ownerId,
       title,
+      category,
+      visibility: 'private',
       original_filename: file.name,
       original_storage_path: path,
       protection_level: protectionLevel,
@@ -318,6 +362,88 @@ export async function listPublicArtistArtworks(artistId: string): Promise<Public
   const { data, error } = await supabase.rpc('list_public_artist_artworks', { p_artist_id: artistId });
   if (error) throw error;
   return (data ?? []) as PublicArtworkRecord[];
+}
+
+export async function updateMyArtworkVisibility(
+  artworkId: string,
+  visibility: ArtworkVisibility,
+): Promise<ArtworkVisibility> {
+  if (!supabase) throw new Error('Secure artwork storage is not configured.');
+  const { data, error } = await supabase.rpc('update_my_artwork_visibility', {
+    p_artwork_id: artworkId,
+    p_visibility: visibility,
+  });
+  if (error) throw error;
+  if (data !== visibility) throw new Error('Supabase did not confirm the saved publication setting.');
+  return data;
+}
+
+export async function listDiscoverArtworks(): Promise<DiscoverArtwork[]> {
+  if (!supabase) throw new Error('Secure artwork storage is not configured.');
+  const { data, error } = await supabase.rpc('list_discover_artworks');
+  if (error) throw error;
+
+  return Promise.all(((data ?? []) as DiscoverArtworkRecord[]).map(async (record) => ({
+    record,
+    previewUrl: await createPublicPortfolioSignedUrl(record.artist_id, record),
+  })));
+}
+
+export async function listDiscoverArtworkEngagement(): Promise<DiscoverArtworkEngagement[]> {
+  if (!supabase) throw new Error('Secure artwork storage is not configured.');
+  const { data, error } = await supabase.rpc('list_discover_artwork_engagement');
+  if (error) throw error;
+  return ((data ?? []) as DiscoverArtworkEngagement[]).map((item) => ({
+    ...item,
+    like_count: Number(item.like_count),
+    comment_count: Number(item.comment_count),
+    liked_by_me: Boolean(item.liked_by_me),
+  }));
+}
+
+export async function setDiscoverArtworkLike(
+  artworkId: string,
+  liked: boolean,
+): Promise<DiscoverArtworkLikeResult> {
+  if (!supabase) throw new Error('Secure artwork storage is not configured.');
+  const { data, error } = await supabase.rpc('set_discover_artwork_like', {
+    p_artwork_id: artworkId,
+    p_liked: liked,
+  });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) throw new Error('Supabase did not return the saved like state.');
+  return {
+    like_count: Number(row.like_count),
+    liked_by_me: Boolean(row.liked_by_me),
+  };
+}
+
+export async function listDiscoverArtworkComments(artworkId: string): Promise<DiscoverArtworkComment[]> {
+  if (!supabase) throw new Error('Secure artwork storage is not configured.');
+  const { data, error } = await supabase.rpc('list_discover_artwork_comments', {
+    p_artwork_id: artworkId,
+  });
+  if (error) throw error;
+  return (data ?? []) as DiscoverArtworkComment[];
+}
+
+export async function createDiscoverArtworkComment(
+  artworkId: string,
+  body: string,
+): Promise<DiscoverArtworkComment> {
+  if (!supabase) throw new Error('Secure artwork storage is not configured.');
+  const trimmedBody = body.trim();
+  if (!trimmedBody) throw new Error('Comment cannot be empty.');
+  if (Array.from(trimmedBody).length > 2000) throw new Error('Comments must be 2,000 characters or fewer.');
+  const { data, error } = await supabase.rpc('create_discover_artwork_comment', {
+    p_artwork_id: artworkId,
+    p_body: trimmedBody,
+  });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) throw new Error('Supabase did not return the saved comment.');
+  return row as DiscoverArtworkComment;
 }
 
 export async function createArtworkOriginalSignedUrl(

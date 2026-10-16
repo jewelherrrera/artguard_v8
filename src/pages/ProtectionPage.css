@@ -65,6 +65,40 @@
   padding: 12px;
 }
 
+.artwork-category-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.artwork-category-field select,
+.artwork-publication-control select {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--ag-border-soft);
+  border-radius: var(--ag-r-sm);
+  color: var(--ag-text-hi);
+  background: var(--ag-surface-2);
+  font: inherit;
+  font-size: 12px;
+}
+
+.artwork-publication-control {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid var(--ag-border-soft);
+  border-radius: var(--ag-r-sm);
+}
+
+.artwork-publication-control .btn {
+  align-self: flex-start;
+}
+
 .protected-artwork-title {
   min-width: 0;
   overflow: hidden;

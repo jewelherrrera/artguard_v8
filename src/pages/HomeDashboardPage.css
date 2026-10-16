@@ -293,11 +293,18 @@
   background: var(--ag-surface-2);
 }
 
-.notification-preview-item > .icon {
+.notification-preview-item > .icon,
+.notification-preview-avatar {
   width: 17px;
   height: 17px;
+  flex: 0 0 17px;
   margin-top: 2px;
   color: var(--ag-accent);
+}
+
+.notification-preview-avatar {
+  border-radius: 50%;
+  object-fit: cover;
 }
 
 .notification-preview-item-copy {

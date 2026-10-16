@@ -9,12 +9,14 @@ import { Icon } from '../assets/icons';
 import { useAuth } from '../context/AuthContext';
 import type { UserRole } from '../types/auth';
 import {
+  assessPassword,
   validateConfirmPassword,
   validateBirthdayField,
   validateEmailField,
   validatePasswordField,
   validateRequired,
 } from '../utils/validators';
+import './SignUpPage.css';
 
 interface FormErrors {
   name?: string;
@@ -37,6 +39,7 @@ export function SignUpPage() {
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | undefined>();
+  const passwordAssessment = assessPassword(password);
 
   const today = new Date();
   const maxBirthday = `${today.getFullYear().toString().padStart(4, '0')}-${(today.getMonth() + 1)
@@ -144,6 +147,38 @@ export function SignUpPage() {
           name="password"
           error={errors.password}
         />
+        <section className="password-guidance" aria-label="Password requirements">
+          <div className="password-strength-row">
+            <span className="password-guidance-title">Password strength</span>
+            {password ? (
+              <span className={`password-strength-label is-${passwordAssessment.strength}`} aria-live="polite">
+                {passwordAssessment.strength[0].toUpperCase() + passwordAssessment.strength.slice(1)}
+              </span>
+            ) : (
+              <span className="password-guidance-hint">Start typing</span>
+            )}
+          </div>
+          <div
+            className={`password-strength-meter${password ? ` is-${passwordAssessment.strength}` : ''}`}
+            role="img"
+            aria-label={password ? `Password strength: ${passwordAssessment.strength}` : 'Password strength not yet assessed'}
+          >
+            <span />
+            <span />
+            <span />
+          </div>
+          <ul className="password-requirements">
+            {passwordAssessment.requirements.map((requirement) => (
+              <li key={requirement.id} className={requirement.satisfied ? 'is-met' : ''}>
+                <span className="password-requirement-mark" aria-hidden="true">
+                  {requirement.satisfied ? '✓' : ''}
+                </span>
+                <span>{requirement.label}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="password-guidance-hint">Use 12+ characters for Strong. Avoid common words and patterns.</p>
+        </section>
         <AuthInput
           label="Confirm password"
           icon="lock"

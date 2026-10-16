@@ -1,10 +1,11 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ScreenShell } from '../components/ui/ScreenShell';
 import { IconButton } from '../components/ui/IconButton';
 import { OptionsMenu } from '../components/ui/OptionsMenu';
 import { ArtTile } from '../components/ui/ArtTile';
+import { ProtectedArtworkDisplay } from '../components/ui/ProtectedArtworkDisplay';
 import { Icon } from '../assets/icons';
 import { useArtworkFeed } from '../context/ArtworkFeedContext';
 import { useAuth } from '../context/AuthContext';
@@ -15,12 +16,33 @@ export function ArtworkDetailPage() {
   const { artworkId } = useParams<{ artworkId?: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { getPost, toggleLike, addComment } = useArtworkFeed();
+  const {
+    getPost,
+    toggleLike,
+    addComment,
+    loadComments,
+    likePendingIds,
+    likeErrors,
+    commentLoading,
+    commentError,
+    commentsLoadedFor,
+    commentPending,
+    loading: feedLoading,
+    error: feedError,
+    refresh: refreshFeed,
+  } = useArtworkFeed();
   const { toast, showToast } = useMockToast();
   const [draft, setDraft] = useState('');
+  const [commentSubmitError, setCommentSubmitError] = useState<string>();
   const commentInputRef = useRef<HTMLInputElement>(null);
 
   const post = artworkId ? getPost(artworkId) : undefined;
+
+  useEffect(() => {
+    if (post?.isSupabase && user) {
+      void loadComments(post.id);
+    }
+  }, [loadComments, post?.id, post?.isSupabase, user]);
 
   if (!post) {
     return (
@@ -31,21 +53,34 @@ export function ArtworkDetailPage() {
           </div>
         }
       >
-        <div className="card t-sm c-mid" style={{ textAlign: 'center' }}>
-          Artwork not found.
+        <div className="card t-sm c-mid" style={{ textAlign: 'center' }} role={feedError ? 'alert' : 'status'}>
+          {feedLoading
+            ? 'Loading protected artwork…'
+            : feedError
+              ? <>Could not load this protected artwork. <button type="button" className="link-sm" onClick={refreshFeed}>Try again</button></>
+              : 'Artwork not found.'}
         </div>
       </ScreenShell>
     );
   }
 
-  const handleSubmitComment = (e: FormEvent) => {
+  const handleSubmitComment = async (e: FormEvent) => {
     e.preventDefault();
     const text = draft.trim();
     if (!text) return;
+    if (Array.from(text).length > 2000) {
+      setCommentSubmitError('Comments must be 2,000 characters or fewer.');
+      return;
+    }
     const authorName = user?.name || 'You';
     const authorInitials = authorName.slice(0, 1).toUpperCase();
-    addComment(post.id, authorName, authorInitials, text);
-    setDraft('');
+    setCommentSubmitError(undefined);
+    try {
+      await addComment(post.id, authorName, authorInitials, text);
+      setDraft('');
+    } catch (error) {
+      setCommentSubmitError(error instanceof Error ? error.message : 'Could not post your comment. Please try again.');
+    }
   };
 
   const focusComments = () => {
@@ -57,7 +92,7 @@ export function ArtworkDetailPage() {
     <ScreenShell
       padContent={false}
       contentClassName="artwork-detail-shell"
-      footer={
+      footer={(
         <form onSubmit={handleSubmitComment} className="comment-composer">
           <div className="input-field" style={{ flex: 1, padding: '11px 14px' }}>
             <input
@@ -67,13 +102,15 @@ export function ArtworkDetailPage() {
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               aria-label="Add a comment"
+              maxLength={2000}
+              disabled={post.isSupabase && !user || commentPending}
             />
           </div>
-          <button type="submit" aria-label="Post comment" className="comment-send-btn" disabled={!draft.trim()}>
+          <button type="submit" aria-label="Post comment" className="comment-send-btn" disabled={!draft.trim() || Array.from(draft.trim()).length > 2000 || commentPending || (post.isSupabase && !user)}>
             <Icon name="send" style={{ width: 16, height: 16, stroke: '#fff' }} />
           </button>
         </form>
-      }
+      )}
     >
       <div className="artwork-hero-wrap">
         <div className="artwork-hero-backbtn-row">
@@ -83,20 +120,30 @@ export function ArtworkDetailPage() {
             ariaLabel="Back to Marketplace"
             style={{ background: 'rgba(0,0,0,0.35)', borderColor: 'rgba(255,255,255,0.2)' }}
           />
-          <OptionsMenu
-            ariaLabel="More options"
-            triggerStyle={{ background: 'rgba(0,0,0,0.35)', borderColor: 'rgba(255,255,255,0.2)' }}
-            items={[
-              { label: 'Share artwork', onClick: () => showToast('Link copied (mock)') },
-              { label: 'Report artwork', onClick: () => showToast('Artwork reported (mock)') },
-            ]}
-          />
+          {!post.isSupabase && (
+            <OptionsMenu
+              ariaLabel="More options"
+              triggerStyle={{ background: 'rgba(0,0,0,0.35)', borderColor: 'rgba(255,255,255,0.2)' }}
+              items={[
+                { label: 'Share artwork', onClick: () => showToast('Link copied (mock)') },
+                { label: 'Report artwork', onClick: () => showToast('Artwork reported (mock)') },
+              ]}
+            />
+          )}
         </div>
         <ArtTile
           variant={post.image}
           className="artwork-hero-tile"
           style={{ width: '100%', aspectRatio: Math.max(post.aspectRatio, 0.7), ['--hero-ar' as string]: Math.max(post.aspectRatio, 0.7) }}
-        />
+        >
+          {post.previewUrl && (
+            <ProtectedArtworkDisplay
+              src={post.previewUrl}
+              alt={`${post.title ?? 'Protected artwork'} by ${post.artistName}`}
+              settings={post.protectionSettings}
+            />
+          )}
+        </ArtTile>
       </div>
 
       <div className="app-content-inner artwork-detail-content">
@@ -118,16 +165,24 @@ export function ArtworkDetailPage() {
               </div>
             </div>
           </button>
-          {post.artistId && (
+          {post.artistId && !post.isSupabase && (
             <span className="badge badge-accent" style={{ flexShrink: 0 }}>
               Books commissions
             </span>
           )}
         </div>
 
-        <p className="t-sm c-mid" style={{ lineHeight: 1.6, marginBottom: 16 }}>
-          {post.caption}
-        </p>
+        {!post.isSupabase && (
+          <div className="artwork-feed-notice" role="note">
+            Demo artwork · likes and comments are session-only.
+          </div>
+        )}
+        {post.title && <h3 className="t-md fw-700" style={{ marginBottom: 8 }}>{post.title}</h3>}
+        {post.caption !== post.title && (
+          <p className="t-sm c-mid" style={{ lineHeight: 1.6, marginBottom: 16 }}>
+            {post.caption}
+          </p>
+        )}
 
         {post.tags.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 18 }}>
@@ -145,7 +200,8 @@ export function ArtworkDetailPage() {
             className="artwork-detail-like-btn"
             aria-pressed={post.liked}
             aria-label={post.liked ? 'Unlike artwork' : 'Like artwork'}
-            onClick={() => toggleLike(post.id)}
+            onClick={() => void toggleLike(post.id)}
+            disabled={likePendingIds.includes(post.id)}
           >
             <Icon
               name="heart"
@@ -160,17 +216,38 @@ export function ArtworkDetailPage() {
           </button>
           <button type="button" className="artwork-detail-comment-btn" onClick={focusComments} aria-label="Jump to comments">
             <Icon name="chat" style={{ width: 18, height: 18, stroke: 'var(--ag-text-mid)' }} />
-            <span className="c-mid fw-700">{post.comments.length}</span>
+            <span className="c-mid fw-700">{post.commentCount ?? post.comments.length}</span>
           </button>
         </div>
+        {likeErrors[post.id] && <div className="artwork-engagement-error" role="alert">{likeErrors[post.id]}</div>}
 
         <hr className="soft" />
 
         <div className="row-between" style={{ margin: '14px 0 12px' }}>
-          <span className="section-title">Comments ({post.comments.length})</span>
+          <span className="section-title">Comments ({post.commentCount ?? post.comments.length})</span>
+          {post.isSupabase && <span className="t-xs c-low">{commentLoading ? 'Loading…' : ''}</span>}
         </div>
 
-        {post.comments.length === 0 && (
+        {post.isSupabase && !user && (
+          <div className="card t-sm c-mid" role="status" style={{ marginBottom: 14 }}>
+            Sign in to view or post comments.
+          </div>
+        )}
+        {post.isSupabase && user && commentLoading && (
+          <div className="card t-sm c-mid" role="status" style={{ marginBottom: 14 }}>Loading comments…</div>
+        )}
+        {post.isSupabase && user && commentError && (
+          <div className="card t-sm c-mid" role="alert" style={{ marginBottom: 14 }}>
+            <div>Could not load comments: {commentError}</div>
+            <button type="button" className="link-sm" onClick={() => void loadComments(post.id)}>Try again</button>
+          </div>
+        )}
+        {post.isSupabase && user && !commentLoading && !commentError && commentsLoadedFor === post.id && post.comments.length === 0 && (
+          <div className="card t-sm c-mid" style={{ textAlign: 'center', marginBottom: 14 }}>
+            No comments yet — be the first to say something.
+          </div>
+        )}
+        {!post.isSupabase && post.comments.length === 0 && (
           <div className="card t-sm c-mid" style={{ textAlign: 'center', marginBottom: 14 }}>
             No comments yet — be the first to say something.
           </div>
@@ -178,8 +255,16 @@ export function ArtworkDetailPage() {
 
         {post.comments.map((comment) => (
           <div className="comment-item" key={comment.id}>
-            <div className="avatar avatar-sm" style={{ background: 'var(--ag-grad-accent)' }}>
-              {comment.authorInitials}
+            <div
+              className="avatar avatar-sm"
+              style={{
+                background: 'var(--ag-grad-accent)',
+                backgroundImage: comment.authorAvatarDataUrl ? `url("${comment.authorAvatarDataUrl}")` : undefined,
+                backgroundPosition: 'center',
+                backgroundSize: 'cover',
+              }}
+            >
+              {!comment.authorAvatarDataUrl && comment.authorInitials}
             </div>
             <div className="comment-bubble">
               <div className="card" style={{ padding: '10px 14px' }}>
@@ -194,6 +279,8 @@ export function ArtworkDetailPage() {
             </div>
           </div>
         ))}
+        {post.isSupabase && !user && <div className="t-xs c-low">Sign in to join the conversation.</div>}
+        {commentSubmitError && <div className="artwork-engagement-error" role="alert">{commentSubmitError}</div>}
       </div>
       {toast}
     </ScreenShell>

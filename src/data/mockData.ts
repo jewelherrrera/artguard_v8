@@ -377,10 +377,25 @@ export interface ArtworkComment {
   authorInitials: string;
   text: string;
   time: string;
+  authorId?: string;
+  authorUsername?: string | null;
+  authorAvatarDataUrl?: string | null;
+  createdAt?: string;
 }
 
 export interface ArtworkPost {
   id: string;
+  title?: string;
+  createdAt?: string;
+  previewUrl?: string;
+  category?: string;
+  isSupabase?: boolean;
+  protectionSettings?: {
+    dynamic_cloaking: boolean;
+    canvas_tiling: boolean;
+    right_click_shield: boolean;
+  };
+  commentCount?: number;
   /** Links back to a full commission profile in ARTISTS, when the poster also takes commissions. */
   artistId?: string;
   artistName: string;
@@ -399,7 +414,7 @@ export interface ArtworkPost {
   comments: ArtworkComment[];
 }
 
-export const DISCOVER_CATEGORIES = ['All', 'Character', 'Chibi', 'Concept Art', 'Portrait', 'Fanart', 'Environment'];
+export const DISCOVER_CATEGORIES = ['All', 'Character', 'Chibi', 'Concept Art', 'Portrait', 'Fanart', 'Environment', 'Other'];
 
 export const ARTWORK_FEED: ArtworkPost[] = [
   {

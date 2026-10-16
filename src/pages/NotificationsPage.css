@@ -111,11 +111,22 @@
   height: 17px;
 }
 
+.notification-icon img {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
+
 .notification-content {
   display: grid;
   gap: 5px;
   min-width: 0;
   flex: 1;
+}
+
+.notification-heading {
+  overflow-wrap: anywhere;
 }
 
 .notification-message {

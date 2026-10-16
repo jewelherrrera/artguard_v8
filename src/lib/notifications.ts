@@ -5,6 +5,8 @@ export type NotificationType =
   | 'commission'
   | 'revision'
   | 'artwork'
+  | 'artwork_like'
+  | 'artwork_comment'
   | 'verification'
   | 'review'
   | 'payment'
@@ -21,6 +23,10 @@ export interface NotificationRecord {
   is_read: boolean;
   related_id: string | null;
   related_route: string | null;
+  actor_id?: string | null;
+  actor_name?: string | null;
+  actor_avatar_data_url?: string | null;
+  dedupe_key?: string | null;
   created_at: string;
 }
 

@@ -188,7 +188,16 @@ export function MarketplacePage() {
   const [commissionSort, setCommissionSort] = useState<CommissionSort>('default');
   const [discoverSort, setDiscoverSort] = useState<DiscoverSort>('newest');
   const { toast, showToast } = useMockToast();
-  const { posts, toggleLike } = useArtworkFeed();
+  const {
+    posts,
+    toggleLike,
+    isSupabaseSource: isRealArtworkFeed,
+    loading: artworksLoading,
+    error: artworksError,
+    refresh: refreshArtworks,
+    likePendingIds,
+    likeErrors,
+  } = useArtworkFeed();
   const [realArtists, setRealArtists] = useState<MarketplaceArtist[]>([]);
   const [realServiceSummariesAvailable, setRealServiceSummariesAvailable] = useState(false);
   const [realReviewSummariesAvailable, setRealReviewSummariesAvailable] = useState(false);
@@ -540,6 +549,8 @@ export function MarketplacePage() {
       const matchesSearch =
         !term ||
         post.artistName.toLowerCase().includes(term) ||
+        (post.title?.toLowerCase().includes(term) ?? false) ||
+        post.artistHandle.toLowerCase().includes(term) ||
         post.caption.toLowerCase().includes(term) ||
         post.tags.some((tag) => tag.toLowerCase().includes(term));
       const matchesArtist = artistFilter === 'All' || post.artistId === artistFilter;
@@ -550,10 +561,15 @@ export function MarketplacePage() {
     });
     return [...matchingArtworks].sort((a, b) => {
       if (discoverSort === 'popular') return b.likes - a.likes;
+      if (isRealArtworkFeed) {
+        return discoverSort === 'oldest'
+          ? Date.parse(a.createdAt ?? '') - Date.parse(b.createdAt ?? '')
+          : Date.parse(b.createdAt ?? '') - Date.parse(a.createdAt ?? '');
+      }
       const ageDifference = postedAgeInHours(a.postedLabel) - postedAgeInHours(b.postedLabel);
       return discoverSort === 'oldest' ? -ageDifference : ageDifference;
     });
-  }, [activeDiscoverTag, artistFilter, discoverSort, likesFilter, posts, search]);
+  }, [activeDiscoverTag, artistFilter, discoverSort, isRealArtworkFeed, likesFilter, posts, search]);
 
   const isDiscover = activeTab === 'discover';
   const artistsWithPosts = marketplaceArtists.filter((artist) => posts.some((post) => post.artistId === artist.id));
@@ -1099,7 +1115,7 @@ export function MarketplacePage() {
             {(isDiscover ? artistsWithPosts : marketplaceArtists).map((artist) => <option key={artist.id} value={artist.id}>{artist.name}</option>)}
           </select>
         </label>
-          {isDiscover ? (
+          {isDiscover && !isRealArtworkFeed ? (
           <label className="market-filter-field">
             <span className="t-xs c-low">Popularity</span>
             <select value={likesFilter} onChange={(event) => setLikesFilter(event.target.value as LikesFilter)}>
@@ -1293,15 +1309,39 @@ export function MarketplacePage() {
             <span className="t-xs c-low">{filteredArtworks.length} artworks</span>
           </div>
 
-          {filteredArtworks.length === 0 && (
+          {!isRealArtworkFeed && (
+            <div className="artwork-feed-notice" role="note">
+              Demo feed · likes and comments are session-only.
+            </div>
+          )}
+          {isRealArtworkFeed && artworksLoading && (
+            <div className="card t-sm c-mid" role="status">Loading published protected artwork…</div>
+          )}
+          {isRealArtworkFeed && !user && (
+            <div className="card t-sm c-mid" role="status">Sign in to view and interact with published artwork.</div>
+          )}
+          {isRealArtworkFeed && !artworksLoading && artworksError && (
+            <div className="card t-sm c-mid" role="alert">
+              <div>Could not load published artwork: {artworksError}</div>
+              <button type="button" className="link-sm" onClick={refreshArtworks}>Try again</button>
+            </div>
+          )}
+          {(!isRealArtworkFeed || (user && !artworksLoading && !artworksError)) && filteredArtworks.length === 0 && (
             <div className="card t-sm c-mid" style={{ textAlign: 'center', marginBottom: 14 }}>
-              No artworks match that search.
+              {isRealArtworkFeed ? 'No published artwork matches these filters yet.' : 'No artworks match that search.'}
             </div>
           )}
 
           <div className="artwork-masonry">
-            {filteredArtworks.map((post) => (
-              <ArtworkCard key={post.id} post={post} onOpen={(id) => navigate(`/market/artwork/${id}`)} onToggleLike={toggleLike} />
+            {(!isRealArtworkFeed || (user && !artworksLoading && !artworksError)) && filteredArtworks.map((post) => (
+              <ArtworkCard
+                key={post.id}
+                post={post}
+                onOpen={(id) => navigate(`/market/artwork/${id}`)}
+                onToggleLike={toggleLike}
+                likePending={likePendingIds.includes(post.id)}
+                likeError={likeErrors[post.id]}
+              />
             ))}
           </div>
         </>

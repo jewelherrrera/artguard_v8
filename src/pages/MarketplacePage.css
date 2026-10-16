@@ -1101,6 +1101,37 @@
   outline-offset: 3px;
 }
 
+.artwork-real-caption {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 7px 3px 0;
+  color: var(--ag-text-mid);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.artwork-real-caption strong {
+  color: var(--ag-text-hi);
+  font-size: 12px;
+}
+
+.artwork-feed-notice {
+  margin-bottom: 12px;
+  padding: 9px 11px;
+  border: 1px solid var(--ag-border-soft);
+  border-radius: var(--ag-r-sm);
+  color: var(--ag-text-low);
+  background: var(--ag-surface-2);
+  font-size: 11px;
+}
+
+.artwork-engagement-error {
+  margin: 8px 0;
+  color: var(--ag-danger, #d94f5c);
+  font-size: 12px;
+}
+
 .artwork-thumb-overlay {
   position: absolute;
   left: 0;

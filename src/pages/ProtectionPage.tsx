@@ -9,15 +9,19 @@ import { Icon } from '../assets/icons';
 import { useMockToast } from '../components/ui/MockToast';
 import { useAuth } from '../context/AuthContext';
 import {
+  ARTWORK_CATEGORIES,
   createArtworkProtectedSignedUrl,
   createArtworkOriginalSignedUrl,
   deleteArtwork,
   listMyArtworks,
   processArtworkProtection,
   updateMyArtworkMetadata,
+  updateMyArtworkVisibility,
   updateArtworkProtectionLevel,
   uploadArtwork,
   type ArtworkRecord,
+  type ArtworkCategory,
+  type ArtworkVisibility,
 } from '../lib/supabaseArtworks';
 import {
   countBlockedProtectionEventsToday,
@@ -59,6 +63,12 @@ function formatArtworkDate(iso: string): string {
 
 function protectionLabel(level: ArtworkRecord['protection_level']): string {
   return level.charAt(0).toUpperCase() + level.slice(1);
+}
+
+function visibilityLabel(visibility: ArtworkVisibility): string {
+  if (visibility === 'portfolio') return 'Protected Portfolio';
+  if (visibility === 'discover') return 'Portfolio + Discover';
+  return 'Private';
 }
 
 function formatEventDate(iso: string): string {
@@ -110,6 +120,10 @@ function ProtectionPageContent() {
   const [processingArtworkId, setProcessingArtworkId] = useState<string | null>(null);
   const [editingArtwork, setEditingArtwork] = useState<{ id: string; title: string; description: string; error?: string } | null>(null);
   const [savingMetadataId, setSavingMetadataId] = useState<string | null>(null);
+  const [uploadCategory, setUploadCategory] = useState<ArtworkCategory>('Other');
+  const [visibilityDrafts, setVisibilityDrafts] = useState<Record<string, ArtworkVisibility>>({});
+  const [visibilityErrors, setVisibilityErrors] = useState<Record<string, string>>({});
+  const [savingVisibilityId, setSavingVisibilityId] = useState<string | null>(null);
 
   const refreshProtectionData = useCallback(async (records: ArtworkRecord[]) => {
     if (!user) {
@@ -327,7 +341,7 @@ function ProtectionPageContent() {
     setUploadError(undefined);
     setUploading(true);
     try {
-      await uploadArtwork(user?.id ?? '', file, level);
+      await uploadArtwork(user?.id ?? '', file, level, uploadCategory);
       await refreshArtworks();
       showToast(`"${file.name}" uploaded to private artwork storage`);
     } catch (error) {
@@ -336,6 +350,41 @@ function ProtectionPageContent() {
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleSaveVisibility = async (artwork: ArtworkRecord) => {
+    if (!user || savingVisibilityId) return;
+    const visibility = visibilityDrafts[artwork.id] ?? artwork.visibility ?? 'private';
+    if (visibility !== 'private' && (artwork.status !== 'ready' || !artwork.protected_storage_path)) {
+      setVisibilityErrors((current) => ({ ...current, [artwork.id]: 'Only ready protected artwork can be published.' }));
+      return;
+    }
+
+    setSavingVisibilityId(artwork.id);
+    setVisibilityErrors((current) => ({ ...current, [artwork.id]: '' }));
+    try {
+      const savedVisibility = await updateMyArtworkVisibility(artwork.id, visibility);
+      setArtworks((current) => current.map((candidate) => candidate.id === artwork.id
+        ? { ...candidate, visibility: savedVisibility }
+        : candidate));
+      setVisibilityDrafts((current) => ({ ...current, [artwork.id]: savedVisibility }));
+    } catch (error) {
+      let refreshError: unknown;
+      try {
+        const currentArtworks = await listMyArtworks(user.id);
+        setArtworks(currentArtworks);
+      } catch (errorWhileRefreshing) {
+        refreshError = errorWhileRefreshing;
+      }
+      setVisibilityErrors((current) => ({
+        ...current,
+        [artwork.id]: error instanceof Error
+          ? `Could not save publication setting: ${error.message}${refreshError instanceof Error ? ` Current server state could not be refreshed: ${refreshError.message}` : ''}`
+          : `Could not save publication setting.${refreshError instanceof Error ? ` Current server state could not be refreshed: ${refreshError.message}` : ' Please try again.'}`,
+      }));
+    } finally {
+      setSavingVisibilityId(null);
     }
   };
 
@@ -418,6 +467,16 @@ function ProtectionPageContent() {
         style={{ display: 'none' }}
         onChange={(e) => void handleFileChosen(e.target.files)}
       />
+      <label className="artwork-category-field">
+        <span className="t-xs c-low">Artwork category</span>
+        <select
+          value={uploadCategory}
+          onChange={(event) => setUploadCategory(event.target.value as ArtworkCategory)}
+          disabled={uploading}
+        >
+          {ARTWORK_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}
+        </select>
+      </label>
       <button
         type="button"
         className="tap-card card"
@@ -550,6 +609,47 @@ function ProtectionPageContent() {
                     {artwork.description && <div className="t-xs c-mid protected-artwork-meta">{artwork.description}</div>}
                     <div className="t-xs c-low protected-artwork-meta">
                       {artwork.original_filename} · {artwork.mime_type.replace('image/', '').toUpperCase()} · {formatFileSize(artwork.file_size_bytes)}
+                    </div>
+                    <div className="artwork-publication-control">
+                      <div className="row-between gap-8">
+                        <label className="t-xs c-low" htmlFor={`artwork-visibility-${artwork.id}`}>Publication</label>
+                        <span className="badge badge-accent">{visibilityLabel(artwork.visibility ?? 'private')}</span>
+                      </div>
+                      <select
+                        id={`artwork-visibility-${artwork.id}`}
+                        value={visibilityDrafts[artwork.id] ?? artwork.visibility ?? 'private'}
+                        onChange={(event) => {
+                          setVisibilityDrafts((current) => ({
+                            ...current,
+                            [artwork.id]: event.target.value as ArtworkVisibility,
+                          }));
+                          setVisibilityErrors((current) => ({ ...current, [artwork.id]: '' }));
+                        }}
+                        disabled={savingVisibilityId === artwork.id}
+                      >
+                        <option value="private">Private</option>
+                        <option value="portfolio" disabled={artwork.status !== 'ready' || !artwork.protected_storage_path}>Protected Portfolio</option>
+                        <option value="discover" disabled={artwork.status !== 'ready' || !artwork.protected_storage_path}>Portfolio + Discover</option>
+                      </select>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => void handleSaveVisibility(artwork)}
+                        disabled={
+                          savingVisibilityId === artwork.id
+                          || ((visibilityDrafts[artwork.id] ?? artwork.visibility ?? 'private') === (artwork.visibility ?? 'private'))
+                          || ((visibilityDrafts[artwork.id] ?? artwork.visibility ?? 'private') !== 'private'
+                            && (artwork.status !== 'ready' || !artwork.protected_storage_path))
+                        }
+                      >
+                        {savingVisibilityId === artwork.id ? 'Saving…' : 'Save publication'}
+                      </button>
+                      {artwork.status !== 'ready' && (
+                        <span className="t-xs c-low">Publishing is available after protection is ready.</span>
+                      )}
+                      {visibilityErrors[artwork.id] && (
+                        <span className="t-xs protection-artwork-error" role="alert">{visibilityErrors[artwork.id]}</span>
+                      )}
                     </div>
                     <div className="row-between protected-artwork-meta">
                       <span className="t-xs c-low">Uploaded {formatArtworkDate(artwork.created_at)}</span>
