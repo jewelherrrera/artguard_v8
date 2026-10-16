@@ -1,0 +1,313 @@
+.app-content-inner.commission-workspace-content {
+  width: min(100%, 900px);
+  min-width: 0;
+}
+
+.commission-workspace-header {
+  gap: 12px;
+}
+
+.commission-workspace-header > .row {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.commission-workspace-header .t-md {
+  display: block;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+}
+
+.workspace-summary-card,
+.workspace-payment-card,
+.workspace-milestone-card,
+.workspace-escrow-card {
+  min-width: 0;
+  padding: 18px !important;
+  border-radius: var(--ag-r-lg);
+  border-color: var(--ag-border-soft);
+  background: var(--ag-surface);
+  box-shadow: var(--ag-shadow-card);
+}
+
+.workspace-summary-card > .row-between:first-child {
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.workspace-summary-card > .row-between:first-child .section-title {
+  margin-bottom: 3px;
+}
+
+.workspace-summary-card .badge {
+  flex: 0 0 auto;
+  max-width: 48%;
+  white-space: normal;
+  text-align: center;
+}
+
+.workspace-counterparty {
+  min-width: 0;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--ag-border-soft);
+  border-radius: var(--ag-r-md);
+  background: var(--ag-surface-2);
+}
+
+.workspace-counterparty > div:not(.avatar) {
+  flex: 1 1 auto;
+  overflow-wrap: anywhere;
+}
+
+.workspace-counterparty .btn {
+  flex: 0 1 auto;
+  width: auto;
+  max-width: 100%;
+  white-space: normal;
+}
+
+.workspace-summary-details {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 12px !important;
+}
+
+.workspace-summary-details > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  padding: 10px;
+  border-radius: var(--ag-r-sm);
+  background: var(--ag-surface-2);
+}
+
+.workspace-summary-details .t-sm {
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.workspace-payment-card {
+  border-top: 2px solid var(--ag-primary);
+}
+
+.workspace-escrow-card {
+  margin-bottom: 16px;
+  border-left: 3px solid var(--ag-primary);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--ag-primary) 7%, var(--ag-surface)),
+    var(--ag-surface) 62%
+  );
+}
+
+.workspace-escrow-heading {
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.workspace-escrow-heading .badge {
+  flex: 0 1 auto;
+  max-width: 62%;
+  white-space: normal;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.workspace-escrow-total,
+.workspace-escrow-refund {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.workspace-escrow-total {
+  align-items: center;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--ag-border-soft);
+}
+
+.workspace-escrow-amount {
+  min-width: 0;
+  max-width: 100%;
+  color: var(--ag-text-hi);
+  font-size: clamp(17px, 5vw, 21px);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.workspace-escrow-breakdown {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 14px 0;
+}
+
+.workspace-escrow-breakdown > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.workspace-escrow-breakdown .t-sm {
+  overflow-wrap: anywhere;
+}
+
+.workspace-escrow-refund {
+  align-items: center;
+  padding: 11px 0;
+  border-top: 1px solid var(--ag-border-soft);
+}
+
+.workspace-escrow-refund .t-xs {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.workspace-escrow-note {
+  margin: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--ag-border-soft);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.workspace-payment-card > .section-title {
+  font-size: 16px;
+}
+
+.workspace-payment-card > .btn,
+.workspace-payment-card .btn {
+  max-width: 100%;
+  white-space: normal;
+}
+
+.workspace-milestone-card > .row-between {
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.workspace-milestone-card > .row-between .section-title {
+  font-size: 16px;
+}
+
+.workspace-milestone-list {
+  min-width: 0;
+  padding: 4px 0 4px 4px !important;
+}
+
+.workspace-milestone-track {
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--ag-primary) 35%, var(--ag-border-soft)) !important;
+}
+
+.workspace-milestone-progress-track {
+  z-index: 0;
+}
+
+.workspace-milestone-items {
+  gap: 18px !important;
+}
+
+.workspace-milestone-item {
+  align-items: flex-start;
+  min-width: 0;
+  gap: 12px;
+}
+
+.workspace-milestone-dot {
+  outline: 4px solid var(--ag-surface);
+  box-shadow: 0 0 0 1px var(--ag-border-soft);
+}
+
+.workspace-milestone-dot[data-status='APPROVED'],
+.workspace-milestone-dot[data-status='approved'] {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ag-success) 15%, transparent);
+}
+
+.workspace-milestone-dot[data-status='IN_PROGRESS'],
+.workspace-milestone-dot[data-status='in-progress'] {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ag-primary) 24%, transparent);
+}
+
+.workspace-milestone-item > div:last-child {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.workspace-milestone-item .row-between {
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.workspace-milestone-item .row-between > :first-child {
+  min-width: 0;
+  flex: 1 1 140px;
+  overflow-wrap: anywhere;
+}
+
+.workspace-milestone-status {
+  flex: 0 0 auto;
+  text-transform: capitalize;
+}
+
+.workspace-milestone-item .btn {
+  white-space: normal;
+}
+
+.commission-workspace-demo .workspace-milestone-heading {
+  margin-bottom: 12px !important;
+}
+
+.commission-workspace-demo .workspace-counterparty {
+  width: 100%;
+  text-align: left;
+}
+
+.commission-workspace-demo .workspace-payment-card {
+  padding: 18px !important;
+}
+
+@media (max-width: 480px) {
+  .app-content-inner.commission-workspace-content {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .commission-workspace-header {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .workspace-summary-card,
+  .workspace-payment-card,
+  .workspace-milestone-card,
+  .workspace-escrow-card {
+    padding: 15px !important;
+    margin-bottom: 12px !important;
+  }
+
+  .workspace-counterparty {
+    flex-wrap: wrap;
+  }
+
+  .workspace-counterparty .btn {
+    flex: 1 1 100%;
+    width: 100%;
+    margin-left: 0 !important;
+  }
+
+  .workspace-summary-details {
+    gap: 8px !important;
+  }
+}
+
+@media (min-width: 768px) {
+  .workspace-summary-details {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)) !important;
+  }
+}

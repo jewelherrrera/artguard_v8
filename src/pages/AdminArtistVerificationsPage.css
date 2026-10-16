@@ -1,0 +1,132 @@
+.admin-verification-page {
+  display: grid;
+  gap: 14px;
+  padding-bottom: 24px;
+}
+
+.admin-verification-empty {
+  text-align: center;
+  padding: 28px 18px;
+}
+
+.admin-verification-card {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-verification-detail {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-verification-detail p {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.admin-verification-interests {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.admin-verification-artworks {
+  display: grid;
+  gap: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--ag-border-soft);
+}
+
+.admin-verification-artwork-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(116px, 1fr));
+  gap: 10px;
+  margin-top: 5px;
+}
+
+.admin-verification-artwork-reference {
+  min-width: 0;
+}
+
+.admin-verification-artwork-preview {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 1.25;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--ag-border-soft);
+  border-radius: var(--ag-r-sm);
+  color: var(--ag-text-low);
+  background: var(--ag-surface-2);
+}
+
+.admin-verification-artwork-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.admin-verification-artwork-preview:not(.unavailable):hover {
+  border-color: var(--ag-accent-soft);
+}
+
+.admin-verification-artwork-title {
+  display: block;
+  margin-top: 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-verification-preview-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--ag-overlay-z-index, 1100);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(8, 13, 27, 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.admin-verification-preview-modal {
+  display: grid;
+  gap: 10px;
+  width: min(100%, 760px);
+  max-height: calc(100dvh - 48px);
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid var(--ag-border);
+  border-radius: var(--ag-r-lg);
+  background: var(--ag-surface);
+  box-shadow: var(--ag-shadow-glow);
+}
+
+.admin-verification-preview-modal img {
+  display: block;
+  width: 100%;
+  max-height: calc(100dvh - 150px);
+  object-fit: contain;
+  border-radius: var(--ag-r-sm);
+  background: var(--ag-surface-2);
+}
+
+.admin-verification-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-verification-actions .btn {
+  width: auto;
+}
+
+.admin-verification-reject-form {
+  display: grid;
+  gap: 7px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ag-border-soft);
+}

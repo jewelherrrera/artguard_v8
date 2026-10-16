@@ -1,0 +1,121 @@
+/* ============================================================
+   ArtistProfilePage — cover photo + overlapping avatar.
+
+   The avatar is meant to sit astride the bottom edge of the cover
+   (a portion tucked into the cover, most of it hanging below), the
+   same convention as the mockup. It's scoped to just the avatar
+   element (not the whole content block) so the overlap amount and
+   the breathing room before the name/stats row can be tuned
+   independently and predictably at any screen size.
+   ============================================================ */
+
+.artist-avatar {
+  /* Rendered inside the cover, so it can cross the cover edge without being
+     clipped by IonContent's scrolling viewport. */
+  position: absolute;
+  left: 20px;
+  bottom: -42px;
+  z-index: 5;
+  margin: 0;
+}
+
+.artist-profile-content {
+  /* 42px hanging below the cover + a small breathing gap before the name. */
+  padding-top: 58px;
+}
+
+.artist-cover {
+  height: 150px;
+  position: relative;
+}
+
+.artist-profile-new-post {
+  width: auto;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.artist-public-posts-empty {
+  display: flex;
+  min-height: 112px;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.artist-public-posts {
+  margin-top: 18px;
+}
+
+.artist-public-posts-heading {
+  margin-bottom: 10px;
+}
+
+.commission-post-icon-actions {
+  margin-top: 0;
+}
+
+/* The avatar previously computed its own left offset from 100vw to mimic
+   .app-content-inner's centered column — but that formula has no idea the
+   desktop nav rail insets .app-shell by 96px, so at desktop widths the
+   avatar and the profile info below it (which centers via the real,
+   rail-aware .app-content-inner) drifted apart. Instead, give the avatar
+   the exact same width-cap-and-auto-margin box as .app-content-inner, so
+   its left edge is guaranteed to match by construction — then the avatar
+   just needs a small fixed inset, not a recomputed formula.
+
+   This wrapper must stay OUT of normal document flow (position: absolute,
+   all four insets — not position: relative), the same way the avatar
+   itself was before this wrapper existed. The cover also contains the
+   back/"..." icon row *before* this element in the DOM; with
+   position: relative it stayed in normal flow and got pushed down by that
+   row's own height, which is what was carrying the avatar down with it
+   into the name/stats below — on both mobile and desktop, since neither
+   ever used position: absolute here. Absolute positioning with matching
+   left/right/width/margin:auto still centers correctly at the desktop
+   tiers below. */
+.artist-cover-inner {
+  position: absolute;
+  inset: 0;
+  /* Now spans the full cover (including the back/"..." buttons' area) —
+     it has no interactive content of its own, so let clicks pass through
+     to whatever's underneath instead of accidentally shadowing those
+     buttons. */
+  pointer-events: none;
+}
+
+@media (max-width: 359px) {
+  .artist-avatar {
+    left: 16px;
+    bottom: -42px;
+  }
+}
+
+@media (min-width: 768px) {
+  .artist-cover {
+    height: 220px;
+  }
+
+  .artist-cover-inner {
+    width: min(100%, 1160px);
+    margin: 0 auto;
+  }
+
+  .artist-avatar {
+    left: 32px;
+  }
+
+  .artist-profile-content {
+    padding-top: 62px;
+  }
+}
+
+@media (min-width: 1440px) {
+  .artist-cover-inner {
+    width: min(100%, 1400px);
+  }
+
+  .artist-avatar {
+    left: 40px;
+  }
+}

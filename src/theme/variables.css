@@ -1,0 +1,145 @@
+/* ============================================================
+   ArtGuard Hub — Design Tokens (Light default / Dark alternate)
+   ------------------------------------------------------------
+   Brand identity (Van Gogh "Starry Night" blue + gold) is shared
+   by BOTH themes — only surface/background/text tokens change.
+   Component CSS in global.css never changes between themes; only
+   the values of these custom properties do.
+
+   Theme is toggled by setting data-theme="light" | "dark" on
+   <html> (see src/context/ThemeContext.tsx). Light is the default
+   and requires no attribute.
+   ============================================================ */
+
+:root {
+  /* -------- Shape tokens (identical in both themes) -------- */
+  --ag-r-xs: 8px;
+  --ag-r-sm: 12px;
+  --ag-r-md: 16px;
+  --ag-r-lg: 22px;
+  --ag-r-xl: 32px;
+  --ag-r-full: 999px;
+
+  /* -------- Brand tokens (identical in both themes) -------- */
+  --ag-primary: #e8b23d;
+  --ag-primary-deep: #c9932a;
+  --ag-secondary: #1d5c8c;
+  --ag-sky: #2e86c9;
+  --ag-plum: #6c6470;
+  --ag-teal: #2dd4bf;
+  --ag-coral: #fb7185;
+  --ag-amber: #e8b23d;
+  --ag-ink: #16213b;
+  --ag-grad-primary: linear-gradient(135deg, #e8b23d 0%, #c9932a 100%);
+  --ag-grad-accent: linear-gradient(135deg, #1d5c8c 0%, #2e86c9 100%);
+
+  /* -------- Ionic core mappings (theme-reactive via var() indirection) -------- */
+  --ion-color-primary: var(--ag-primary);
+  --ion-color-primary-rgb: 232, 178, 61;
+  --ion-color-primary-contrast: var(--ag-ink);
+  --ion-color-primary-contrast-rgb: 22, 33, 59;
+  --ion-color-primary-shade: var(--ag-primary-deep);
+  --ion-color-primary-tint: #ecbd57;
+
+  --ion-color-secondary: var(--ag-secondary);
+  --ion-color-secondary-rgb: 29, 92, 140;
+  --ion-color-secondary-contrast: #ffffff;
+  --ion-color-secondary-contrast-rgb: 255, 255, 255;
+  --ion-color-secondary-shade: #19517b;
+  --ion-color-secondary-tint: #336d98;
+
+  --ion-color-danger: var(--ag-danger);
+  --ion-color-danger-contrast: var(--ag-ink);
+  --ion-color-danger-contrast-rgb: 22, 33, 59;
+  --ion-color-danger-shade: #da6363;
+  --ion-color-danger-tint: #f97f7f;
+
+  --ion-color-success: var(--ag-success);
+  --ion-color-success-contrast: var(--ag-ink);
+  --ion-color-success-contrast-rgb: 22, 33, 59;
+  --ion-color-success-shade: #2eba87;
+  --ion-color-success-tint: #48d7a3;
+
+  --ion-background-color: var(--ag-bg);
+  --ion-text-color: var(--ag-text-hi);
+  --ion-toolbar-background: var(--ag-bg-2);
+  --ion-item-background: transparent;
+  --ion-font-family: 'Inter', sans-serif;
+}
+
+/* ============================================================
+   LIGHT THEME (default) — clean white/alabaster surfaces, the
+   same blue + gold brand accents as dark mode.
+   ============================================================ */
+:root,
+[data-theme='light'] {
+  --ag-bg: #f7f6f1;
+  --ag-bg-2: #ffffff;
+  --ag-surface: #ffffff;
+  --ag-surface-2: #f0f1ec;
+  --ag-surface-3: #e4e7ef;
+  --ag-border: rgba(29, 92, 140, 0.2);
+  --ag-border-soft: rgba(22, 33, 59, 0.09);
+  --ag-accent: #93670f;
+  --ag-accent-soft: #a97a1c;
+  --ag-success: #14966d;
+  --ag-warning: #a6740f;
+  --ag-danger: #d64545;
+  --ag-text-hi: #16213b;
+  --ag-text-mid: #4d5b73;
+  --ag-text-low: #7c869a;
+
+  --ag-grad-bg: radial-gradient(120% 90% at 15% -10%, rgba(46, 134, 201, 0.12) 0%, transparent 55%),
+    radial-gradient(90% 70% at 100% 0%, rgba(232, 178, 61, 0.16) 0%, transparent 42%);
+
+  --ag-shadow-card: 0 6px 20px rgba(22, 33, 59, 0.08);
+  --ag-shadow-glow: 0 0 0 1px rgba(29, 92, 140, 0.14), 0 12px 32px rgba(29, 92, 140, 0.14);
+
+  /* "Glass" card surface (used for callouts like the Shield Active card and
+     revision-request chat bubbles). Must stay theme-reactive: a translucent
+     dark panel reads fine in dark mode but hides dark-navy light-mode text. */
+  --ag-glass-bg: rgba(255, 255, 255, 0.72);
+  --ag-glass-border: rgba(22, 33, 59, 0.1);
+  --ag-sticky-bg: rgba(255, 255, 255, 0.92);
+  --ag-sticky-price: #16213b;
+
+  --ion-background-color-rgb: 247, 246, 241;
+  --ion-text-color-rgb: 22, 33, 59;
+  color-scheme: light;
+}
+
+/* ============================================================
+   DARK THEME — ported 1:1 from artguard-hub-ui-mockups.html.
+   ============================================================ */
+[data-theme='dark'] {
+  --ag-bg: #0e1526;
+  --ag-bg-2: #121b30;
+  --ag-surface: #1a2540;
+  --ag-surface-2: #223255;
+  --ag-surface-3: #2b3d63;
+  --ag-border: rgba(232, 178, 61, 0.16);
+  --ag-border-soft: rgba(255, 255, 255, 0.07);
+  --ag-accent: #f2d98c;
+  --ag-accent-soft: #f7e3ac;
+  --ag-success: #34d399;
+  --ag-warning: #e8b23d;
+  --ag-danger: #f87171;
+  --ag-text-hi: #f5f1e6;
+  --ag-text-mid: #aebeda;
+  --ag-text-low: #78889f;
+
+  --ag-grad-bg: radial-gradient(120% 90% at 15% -10%, #1e3a5f 0%, #0e1526 55%),
+    radial-gradient(90% 70% at 100% 0%, rgba(201, 147, 42, 0.5) 0%, transparent 38%);
+
+  --ag-shadow-card: 0 8px 24px rgba(3, 5, 16, 0.45);
+  --ag-shadow-glow: 0 0 0 1px rgba(232, 178, 61, 0.15), 0 12px 32px rgba(29, 92, 140, 0.35);
+
+  --ag-glass-bg: rgba(30, 39, 67, 0.55);
+  --ag-glass-border: rgba(255, 255, 255, 0.08);
+  --ag-sticky-bg: rgba(15, 20, 40, 0.9);
+  --ag-sticky-price: #ffffff;
+
+  --ion-background-color-rgb: 14, 21, 38;
+  --ion-text-color-rgb: 245, 241, 230;
+  color-scheme: dark;
+}

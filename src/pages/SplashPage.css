@@ -1,0 +1,196 @@
+.splash-viewport {
+  --background: transparent;
+  min-height: 100dvh;
+}
+
+/* Full-bleed on every platform (Web/Android/iPhone) — never the mockup's
+   fixed 308x666 frame. Explicit width/height + flex-direction:column make
+   sure this <button> centers its content on both axes regardless of
+   viewport size, instead of shrinking to content width and drifting left
+   (the button's default box behavior unless width is forced, same reason
+   `.btn` elsewhere in this app also sets width:100% explicitly). */
+.splash-body {
+  width: 100%;
+  height: 100%;
+  min-height: 100dvh;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(120% 70% at 50% 0%, #1e3a5f 0%, #0e1526 60%);
+  transition: opacity 0.52s ease, transform 0.52s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.splash-body::before {
+  content: '';
+  position: absolute;
+  inset: -20%;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 42%, rgba(232, 178, 61, 0.12), transparent 28%);
+  animation: splash-light-drift 9s ease-in-out infinite alternate;
+}
+
+.splash-body.is-exiting {
+  opacity: 0;
+  transform: scale(1.015);
+}
+
+.splash-weave {
+  position: absolute;
+  inset: 0;
+  opacity: 0.5;
+  background-image: repeating-linear-gradient(135deg, rgba(232, 178, 61, 0.08) 0 2px, transparent 2px 26px),
+    repeating-linear-gradient(45deg, rgba(46, 134, 201, 0.08) 0 2px, transparent 2px 26px);
+  animation: splash-weave-drift 18s linear infinite;
+}
+
+.splash-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.splash-mark {
+  width: 92px;
+  height: 92px;
+  border-radius: 26px;
+  background: var(--ag-grad-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18), 0 20px 50px rgba(201, 147, 42, 0.5);
+  animation: splash-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes splash-pop {
+  from {
+    transform: scale(0.7);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.splash-mark-logo {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+}
+
+.splash-title {
+  font-family: 'P22 Vincent', cursive;
+  font-weight: 400;
+  font-size: 46px;
+  letter-spacing: 0.01em;
+  color: #fff;
+  line-height: 1;
+  text-align: center;
+  animation: splash-copy-in 0.8s 0.18s both cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.splash-tagline {
+  margin-top: 8px;
+  letter-spacing: 0.02em;
+  text-align: center;
+  max-width: 330px;
+  line-height: 1.5;
+  animation: splash-copy-in 0.8s 0.38s both cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.splash-footer {
+  position: absolute;
+  bottom: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  animation: splash-footer-in 0.8s 0.72s both ease-out;
+}
+
+.splash-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.splash-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(232, 178, 61, 0.35);
+  transition: background 0.25s;
+}
+
+.splash-dot.is-active {
+  background: var(--ag-accent);
+}
+
+@keyframes splash-copy-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes splash-footer-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes splash-light-drift {
+  from {
+    transform: translate3d(-4%, -2%, 0) scale(0.95);
+  }
+  to {
+    transform: translate3d(4%, 3%, 0) scale(1.08);
+  }
+}
+
+@keyframes splash-weave-drift {
+  from {
+    background-position: 0 0, 0 0;
+  }
+  to {
+    background-position: 52px 52px, -52px 52px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splash-body,
+  .splash-mark,
+  .splash-weave,
+  .splash-body::before,
+  .splash-title,
+  .splash-tagline,
+  .splash-footer {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* Only resets the <button>'s UA border/padding — must NOT set `background`
+   here: this class is combined on the same element as `.splash-body`
+   (which supplies the real radial-gradient background), and since both are
+   equal-specificity class selectors, a `background` declared here would
+   win the cascade by source order and silently erase that gradient. */
+.splash-hint {
+  border: none;
+  padding: 0;
+}

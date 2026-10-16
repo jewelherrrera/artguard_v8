@@ -1,0 +1,7 @@
+{
+  "name": "artguard-hub",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "react-vite"
+}

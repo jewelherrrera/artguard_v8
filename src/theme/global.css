@@ -1,0 +1,1243 @@
+/* ============================================================
+   ArtGuard Hub — Global base + component classes
+   Ported from artguard-hub-ui-mockups.html so the app matches
+   the mockup exactly. Class names are kept identical on purpose.
+   ============================================================ */
+
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  /* The nav remains a 60px capsule. Overlays use this separate footprint so
+     their surfaces and scroll containers clear it without changing the nav. */
+  --ag-overlay-z-index: 1100;
+  --ag-overlay-bottom-clearance: calc(60px + max(10px, env(safe-area-inset-bottom, 0px)) + 16px);
+}
+
+html,
+body {
+  background: var(--ag-bg);
+  min-height: 100%;
+}
+
+body {
+  transition: background-color 0.2s ease;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: 'Space Grotesk', sans-serif;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+::selection {
+  background: var(--ag-secondary);
+  color: #fff;
+}
+
+.icon {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+}
+
+/* ============ Brand mark (logo) ============
+   For spots where the badge background flips between the light and dark
+   theme (see ThemeContext, [data-theme] on <html>), <BrandMark themed=.../>
+   renders both logo colors and this shows only the one matching the
+   current theme, instead of a single static color that would lose
+   contrast when the theme is switched. */
+.brand-mark-dark {
+  display: none;
+}
+[data-theme='dark'] .brand-mark-light {
+  display: none;
+}
+[data-theme='dark'] .brand-mark-dark {
+  display: block;
+}
+
+/* ============ Layout primitives ============ */
+.row {
+  display: flex;
+  align-items: center;
+}
+.row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.gap-8 {
+  gap: 8px;
+}
+.gap-10 {
+  gap: 10px;
+}
+.gap-12 {
+  gap: 12px;
+}
+.gap-14 {
+  gap: 14px;
+}
+
+/* ============ Cards ============ */
+.card {
+  background: var(--ag-surface);
+  border: 1px solid var(--ag-border-soft);
+  border-radius: var(--ag-r-lg);
+  padding: 18px;
+  box-shadow: var(--ag-shadow-card);
+}
+
+/* ============ Buttons ============ */
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  border-radius: var(--ag-r-full);
+  font-weight: 600;
+  font-size: 14.5px;
+  padding: 14px 22px;
+  width: 100%;
+  transition: opacity 0.2s, transform 0.15s;
+  font-family: 'Inter', sans-serif;
+}
+.btn:active {
+  transform: scale(0.98);
+}
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+.btn-primary {
+  background: var(--ag-grad-primary);
+  color: var(--ag-ink);
+  box-shadow: 0 8px 20px rgba(201, 147, 42, 0.4);
+}
+.btn-primary .icon {
+  stroke: var(--ag-ink);
+}
+.btn-secondary {
+  background: var(--ag-surface-3);
+  color: var(--ag-text-hi);
+  border: 1px solid var(--ag-border);
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--ag-text-mid);
+  border: 1px solid var(--ag-border-soft);
+}
+.btn-sm {
+  padding: 9px 16px;
+  font-size: 12.5px;
+  width: auto;
+}
+@media (max-width: 1023px) {
+  .commission-cancel-button {
+    width: fit-content;
+    max-width: 100%;
+    min-height: 44px;
+  }
+}
+
+/* ============ Form fields ============ */
+.field-label {
+  font-size: 12px;
+  color: var(--ag-text-mid);
+  font-weight: 600;
+  margin-bottom: 7px;
+  display: block;
+}
+.input-field {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  background: var(--ag-surface-2);
+  border: 1px solid var(--ag-border-soft);
+  border-radius: var(--ag-r-md);
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ag-text-low);
+  font-size: 13.5px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  box-sizing: border-box;
+}
+.input-field.is-focused {
+  border-color: var(--ag-primary);
+  box-shadow: 0 0 0 3px rgba(232, 178, 61, 0.14);
+}
+.input-field.is-error {
+  border-color: var(--ag-danger);
+  box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.14);
+}
+.input-field input {
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--ag-text-hi);
+  font-size: 14px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  font-family: 'Inter', sans-serif;
+}
+.input-field input::placeholder {
+  color: var(--ag-text-low);
+}
+.input-field button.eye-toggle {
+  background: none;
+  border: none;
+  padding: 2px;
+  display: flex;
+  color: var(--ag-text-low);
+}
+.input-field button.eye-toggle:hover {
+  color: var(--ag-text-mid);
+}
+.textarea-field {
+  background: var(--ag-surface-2);
+  border: 1px solid var(--ag-border-soft);
+  border-radius: var(--ag-r-md);
+  padding: 12px 14px;
+  color: var(--ag-text-hi);
+  font-size: 14px;
+  font-family: 'Inter', sans-serif;
+  width: 100%;
+  resize: vertical;
+  min-height: 84px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.textarea-field::placeholder {
+  color: var(--ag-text-low);
+}
+.textarea-field:focus {
+  outline: none;
+  border-color: var(--ag-primary);
+  box-shadow: 0 0 0 3px rgba(232, 178, 61, 0.14);
+}
+.field-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ag-danger);
+  font-size: 11.5px;
+  font-weight: 500;
+  margin-top: 6px;
+}
+.field-hint {
+  color: var(--ag-text-low);
+  font-size: 11.5px;
+  margin-top: 6px;
+}
+
+/* ============ Avatars ============ */
+.avatar {
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 600;
+  color: #fff;
+  flex-shrink: 0;
+  background: var(--ag-grad-accent);
+}
+.avatar-xs {
+  width: 22px;
+  height: 22px;
+  font-size: 9px;
+}
+.avatar-sm {
+  width: 34px;
+  height: 34px;
+  font-size: 12px;
+}
+.avatar-md {
+  width: 44px;
+  height: 44px;
+  font-size: 15px;
+}
+.avatar-lg {
+  width: 64px;
+  height: 64px;
+  font-size: 20px;
+  border: 3px solid var(--ag-bg-2);
+}
+.avatar-xl {
+  width: 84px;
+  height: 84px;
+  font-size: 26px;
+  border: 4px solid var(--ag-bg-2);
+}
+
+.section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ag-text-hi);
+}
+.link-sm {
+  font-size: 12px;
+  color: var(--ag-accent);
+  font-weight: 600;
+  background: none;
+  border: none;
+  padding: 0;
+}
+hr.soft {
+  border: none;
+  height: 1px;
+  background: var(--ag-border-soft);
+  margin: 14px 0;
+}
+
+/* ============ Chips / badges ============ */
+.chip {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 7px 14px;
+  border-radius: var(--ag-r-full);
+  background: var(--ag-surface-2);
+  color: var(--ag-text-mid);
+  border: 1px solid var(--ag-border-soft);
+  white-space: nowrap;
+}
+.chip-active {
+  background: var(--ag-grad-primary);
+  color: var(--ag-ink);
+  border-color: transparent;
+  font-weight: 700;
+}
+.badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: var(--ag-r-full);
+  letter-spacing: 0.02em;
+}
+.badge-danger {
+  background: rgba(248, 113, 113, 0.15);
+  color: var(--ag-danger);
+}
+.badge-success {
+  background: rgba(52, 211, 153, 0.15);
+  color: var(--ag-success);
+}
+.badge-warning {
+  background: rgba(232, 178, 61, 0.15);
+  color: var(--ag-warning);
+}
+.badge-accent {
+  background: rgba(232, 178, 61, 0.16);
+  color: var(--ag-accent);
+}
+/* ============ Chat presence indicator (shared: inbox list + conversation header) ============ */
+.presence-online {
+  background: var(--ag-success);
+}
+.presence-offline {
+  background: var(--ag-text-low);
+}
+.presence-recent {
+  background: var(--ag-warning);
+}
+.presence-dot {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid var(--ag-bg);
+}
+.presence-dot-inline {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.unread-badge {
+  min-width: 19px;
+  height: 19px;
+  padding: 0 6px;
+  border-radius: var(--ag-r-full);
+  background: var(--ag-danger);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+/* ============ Text utilities ============ */
+.t-xs {
+  font-size: 11px;
+}
+.t-sm {
+  font-size: 12.5px;
+}
+.t-md {
+  font-size: 14px;
+}
+.c-low {
+  color: var(--ag-text-low);
+}
+.c-mid {
+  color: var(--ag-text-mid);
+}
+.c-hi {
+  color: var(--ag-text-hi);
+}
+.c-success {
+  color: var(--ag-success);
+}
+.c-danger {
+  color: var(--ag-danger);
+}
+.c-warning {
+  color: var(--ag-warning);
+}
+.c-accent {
+  color: var(--ag-accent);
+}
+.fw-600 {
+  font-weight: 600;
+}
+.fw-700 {
+  font-weight: 700;
+}
+
+/* ============================================================
+   App shell (non-auth screens): header + scroll content + footer
+   ============================================================ */
+.app-page {
+  --background: var(--ag-bg);
+}
+.app-page::part(background) {
+  background: var(--ag-bg);
+  background-image: var(--ag-grad-bg);
+}
+.app-shell {
+  --ag-bottom-nav-space: 0px;
+  height: 100%;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--ag-bg);
+  background-image: var(--ag-grad-bg);
+  max-width: 100%;
+  overflow-x: hidden;
+}
+@media (min-width: 768px) {
+  .app-shell {
+    padding: 0;
+    background-image: var(--ag-grad-bg),
+      radial-gradient(60% 40% at 20% 0%, rgba(29, 92, 140, 0.2) 0%, transparent 60%),
+      radial-gradient(50% 35% at 85% 8%, rgba(232, 178, 61, 0.1) 0%, transparent 60%);
+  }
+}
+.app-frame {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+@media (min-width: 768px) {
+  .app-frame {
+    max-width: none;
+    height: 100%;
+    border-radius: 0;
+    border: 0;
+    box-shadow: none;
+  }
+}
+
+.app-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  /* IonContent defaults to an absolute, fullscreen viewport. In ScreenShell
+     that would let its scrolling layer slide underneath the fixed header
+     (notably the artist cover/avatar). Keep it in the flex flow so every
+     page body begins below its header and above its footer. */
+  position: relative !important;
+  inset: auto !important;
+  height: auto !important;
+  --background: transparent;
+}
+.app-content::part(background) {
+  background: transparent;
+}
+.app-content-inner {
+  padding: 0 20px 28px;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Mobile bottom-nav is a floating layer, so every ScreenShell that renders
+   it reserves the same space in its scroll content. This keeps the final
+   focusable element above the capsule without page-specific padding. */
+@media (max-width: 1023px) {
+  .app-shell:has(.bottom-nav) {
+    --ag-bottom-nav-space: calc(86px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .app-shell:has(.bottom-nav) .app-content-inner {
+    padding-bottom: calc(28px + var(--ag-bottom-nav-space));
+  }
+}
+
+/* px-hd: fixed, non-scrolling header block above IonContent */
+.px-hd {
+  padding: calc(env(safe-area-inset-top, 0px) + 14px) 20px 14px;
+  flex-shrink: 0;
+}
+
+/* Desktop is a real, wide application workspace—not a scaled phone mockup.
+   Mobile keeps the edge-to-edge app treatment above; at tablet/desktop sizes
+   content gains comfortable gutters and a readable, responsive max width. */
+@media (min-width: 768px) {
+  .app-content-inner {
+    width: min(100%, 1160px);
+    margin: 0 auto;
+    padding: 8px 32px 40px;
+  }
+
+  .px-hd {
+    padding-left: max(32px, calc((100% - 1096px) / 2));
+    padding-right: max(32px, calc((100% - 1096px) / 2));
+    padding-top: 22px;
+    padding-bottom: 18px;
+  }
+
+  /* A toggle or search field stretched to a 1000px+ desktop content width
+     reads as broken, not spacious — cap them to a sensible control width
+     regardless of how wide the surrounding column gets. Mobile is
+     unaffected: these caps only bind once the container is already wider
+     than the cap. */
+  .segmented {
+    max-width: 420px;
+  }
+  .search-bar {
+    max-width: 640px;
+  }
+}
+
+/* Large desktop: a 1160px cap still leaves a lot of an ultra/large monitor
+   empty on either side. Widen the shared content column further, but keep
+   growth capped (never truly full-bleed) so line lengths and card rows
+   don't stretch to the point of feeling sparse on very wide screens. */
+@media (min-width: 1440px) {
+  .app-content-inner {
+    width: min(100%, 1400px);
+    padding-left: 40px;
+    padding-right: 40px;
+  }
+
+  .px-hd {
+    padding-left: max(40px, calc((100% - 1320px) / 2));
+    padding-right: max(40px, calc((100% - 1320px) / 2));
+  }
+}
+
+
+.h-title {
+  font-size: 25px;
+  font-weight: 400;
+  font-family: 'P22 Vincent', cursive;
+  letter-spacing: 0.01em;
+  color: var(--ag-text-hi);
+}
+.h-sub {
+  font-size: 12.5px;
+  color: var(--ag-text-low);
+  margin-top: 2px;
+}
+
+/* ============ Icon button ============ */
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ag-surface-2);
+  border: 1px solid var(--ag-border-soft);
+  color: var(--ag-text-mid);
+  position: relative;
+  flex-shrink: 0;
+  padding: 0;
+}
+.icon-btn .icon {
+  width: 17px;
+  height: 17px;
+}
+.icon-btn .badge-dot {
+  position: absolute;
+  top: 6px;
+  right: 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ag-coral);
+  border: 1.5px solid var(--ag-surface-2);
+}
+.icon-btn .notification-count-badge {
+  position: absolute;
+  top: -5px;
+  right: -7px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--ag-danger);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 17px;
+  text-align: center;
+  border: 1.5px solid var(--ag-surface-2);
+}
+
+/* ============ Reusable "more options" dropdown ============
+   Same look as Chat's header menu (.chat-menu-dropdown /
+   .chat-menu-item in ChatPage.css) so new ⋮ menus elsewhere in the
+   app (artist profiles, commissions, artwork detail, etc.) match
+   without touching the chat implementation itself. */
+.options-menu-wrap {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.options-menu-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  padding: 6px;
+  width: 190px;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.options-menu-dropdown-left {
+  right: auto;
+  left: 0;
+}
+.options-menu-item {
+  padding: 10px 12px;
+  border-radius: var(--ag-r-sm);
+  font-size: 13px;
+  font-weight: 600;
+  background: none;
+  border: none;
+  color: var(--ag-text-hi);
+  text-align: left;
+}
+.options-menu-item:active {
+  background: var(--ag-surface-2);
+}
+
+/* ============ Card glass ============ */
+/* Theme-reactive: light mode gets a light glass panel (dark text stays
+   readable), dark mode keeps the original dark glass panel. Never hardcode
+   this background directly on an element — always go through the token so
+   both themes stay legible (see "Shield Active" card / revision bubbles). */
+.card-glass {
+  background: var(--ag-glass-bg);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid var(--ag-glass-border);
+  border-radius: var(--ag-r-lg);
+  padding: 18px;
+  color: var(--ag-text-hi);
+}
+
+/* ============ Search bar ============ */
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--ag-surface-2);
+  border: 1px solid var(--ag-border-soft);
+  border-radius: var(--ag-r-full);
+  padding: 12px 16px;
+  color: var(--ag-text-low);
+  font-size: 13.5px;
+  width: 100%;
+}
+.search-bar input {
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--ag-text-hi);
+  font-size: 13.5px;
+  width: 100%;
+  font-family: 'Inter', sans-serif;
+}
+.search-bar input::placeholder {
+  color: var(--ag-text-low);
+}
+
+/* ============ Chip row (horizontal scroll only here) ============ */
+.chip-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.chip-row::-webkit-scrollbar {
+  display: none;
+}
+.chip-btn {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+}
+
+/* ============ Toggle switch ============ */
+.toggle {
+  width: 42px;
+  height: 24px;
+  border-radius: var(--ag-r-full);
+  position: relative;
+  flex-shrink: 0;
+  border: none;
+  padding: 0;
+  transition: background 0.18s;
+}
+.toggle-on {
+  background: var(--ag-grad-primary);
+}
+.toggle-off {
+  background: var(--ag-surface-3);
+}
+.toggle .knob {
+  position: absolute;
+  top: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 0.18s, right 0.18s;
+}
+.toggle-on .knob {
+  right: 3px;
+}
+.toggle-off .knob {
+  left: 3px;
+}
+
+/* ============ Progress ============ */
+.progress-track {
+  height: 6px;
+  border-radius: var(--ag-r-full);
+  background: var(--ag-surface-3);
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: var(--ag-r-full);
+  background: var(--ag-grad-accent);
+  transition: width 0.3s;
+}
+
+/* ============ Protected art tile (signature motif) ============ */
+.art-tile {
+  position: relative;
+  border-radius: var(--ag-r-md);
+  overflow: hidden;
+  background: #1a1f3a;
+  border: none;
+  padding: 0;
+  display: block;
+  flex-shrink: 0;
+}
+.art-tile::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0 1.5px, transparent 1.5px 11px),
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.06) 0 1.5px, transparent 1.5px 11px);
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+.art-tile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+.art-1 {
+  background: linear-gradient(135deg, #1d5c8c, #e8b23d 85%);
+}
+.art-2 {
+  background: linear-gradient(135deg, #14243b, #2e86c9 75%);
+}
+.art-3 {
+  background: linear-gradient(135deg, #6c6470, #e8b23d 80%);
+}
+.art-4 {
+  background: linear-gradient(135deg, #2e86c9, #f2d98c 85%);
+}
+.art-5 {
+  background: linear-gradient(135deg, #1d5c8c, #6c6470 75%);
+}
+.art-6 {
+  background: linear-gradient(135deg, #e8b23d, #1d5c8c 80%);
+}
+.lock-badge {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(11, 15, 30, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+}
+.lock-badge .icon {
+  width: 11px;
+  height: 11px;
+  stroke: #fff;
+}
+
+/* ============ Bottom navigation ============ */
+.bottom-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+    /* Safe-area clearance belongs to the fixed position below, not the
+      capsule's internal flex space. */
+  width: min(calc(100% - 32px), 520px);
+  height: 60px;
+  min-height: 60px;
+    padding: 4px 8px;
+  background: color-mix(in srgb, var(--ag-ink) 82%, transparent);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--ag-r-full);
+  box-shadow: 0 14px 34px rgba(3, 5, 16, 0.34), inset 0 1px rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+  position: fixed;
+  left: 50%;
+  bottom: max(10px, env(safe-area-inset-bottom, 0px));
+  z-index: 1000;
+  transform: translateX(-50%);
+}
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--ag-text-low);
+  flex: 1;
+  background: none;
+  border: none;
+  min-width: 0;
+  min-height: 0;
+  padding: 3px 2px;
+  border-radius: var(--ag-r-full);
+  position: relative;
+  overflow: visible;
+  transition: color 0.18s;
+}
+.nav-item-active-background {
+  position: absolute;
+  inset: 4px 6px;
+  z-index: 0;
+  border-radius: var(--ag-r-full);
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.12), 0 0 18px rgba(232, 178, 61, 0.12);
+  pointer-events: none;
+}
+.nav-item-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 56px;
+  height: calc(100% - 8px);
+  padding: 3px 8px;
+  border-radius: var(--ag-r-full);
+  font-size: 9.5px;
+  font-weight: 600;
+  position: relative;
+  z-index: 1;
+}
+.nav-item .icon {
+  width: 21px;
+  height: 21px;
+}
+.nav-item.active {
+  color: var(--ag-accent-soft);
+}
+.nav-item.active .icon {
+  stroke: var(--ag-accent-soft);
+  filter: drop-shadow(0 0 6px rgba(232, 178, 61, 0.6));
+}
+.nav-icon-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.nav-badge {
+  position: absolute;
+  top: -4px;
+  right: -8px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: var(--ag-danger);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  border: 1.5px solid var(--ag-sticky-bg);
+}
+
+/* The same capsule adapts its glass surface to the active theme. */
+[data-theme='light'] .bottom-nav {
+  background: color-mix(in srgb, var(--ag-bg-2) 78%, transparent);
+  border-color: var(--ag-glass-border);
+  box-shadow: 0 14px 34px rgba(22, 33, 59, 0.16), inset 0 1px rgba(255, 255, 255, 0.78);
+}
+[data-theme='light'] .nav-item {
+  color: var(--ag-text-mid);
+}
+[data-theme='light'] .nav-item.active {
+  color: var(--ag-accent);
+}
+[data-theme='light'] .nav-item-active-background {
+  background: color-mix(in srgb, var(--ag-accent) 12%, transparent);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.78), 0 0 18px color-mix(in srgb, var(--ag-accent) 22%, transparent);
+}
+[data-theme='light'] .nav-item.active .icon {
+  stroke: var(--ag-accent);
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--ag-accent) 44%, transparent));
+}
+
+@media (max-width: 1023px) {
+  .nav-item {
+    height: 100%;
+  }
+  .nav-item-content {
+    height: calc(100% - 8px);
+  }
+}
+
+/* ============ Desktop nav rail ============
+   Desktop/web is a real application window, not a phone screen — a bottom
+   tab bar stretched edge-to-edge across a wide monitor is the single
+   clearest "mobile layout, just wider" tell. At desktop widths the exact
+   same nav (same buttons, same active state, same click targets) becomes a
+   fixed left rail instead, matching how apps like Pinterest/Telegram use
+   the side of the window for primary navigation. Pages that don't render
+   BottomNav (detail/settings screens) are unaffected — :has() only pads
+   the shells that actually contain the rail, so nothing shifts on screens
+   with no nav to clear. */
+@media (min-width: 1024px) {
+  .bottom-nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: auto;
+    width: 96px;
+    height: 100dvh;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: stretch;
+    gap: 6px;
+    padding: 28px 10px;
+    border-top: none;
+    border-right: 1px solid var(--ag-border-soft);
+    z-index: 40;
+    transform: none;
+    border-radius: 0;
+    background: var(--ag-sticky-bg);
+    box-shadow: none;
+  }
+  .nav-item {
+    flex: none;
+    padding: 0;
+    border-radius: var(--ag-r-md);
+    transition: background 0.15s;
+  }
+  .nav-item-content {
+    width: 100%;
+    height: auto;
+    min-width: 0;
+    padding: 10px 4px;
+    border-radius: var(--ag-r-md);
+    font-size: 10.5px;
+  }
+  .nav-item-active-background {
+    inset: 4px;
+    border-radius: var(--ag-r-md);
+  }
+  .nav-item:hover .nav-item-content {
+    background: var(--ag-surface-2);
+  }
+
+  .app-shell:has(.bottom-nav) {
+    padding-left: 96px;
+  }
+
+  /* The mock toast centers on the viewport; re-center it on the visible
+     content area now that the rail occupies the left 96px. */
+  .mock-toast,
+  .status-toast {
+    left: calc(50% + 48px);
+  }
+}
+
+/* Shared protection for page-owned fixed dialogs and Ionic's portalled
+   overlays. Ionic controls their stacking; these variables let custom
+   surfaces and overlay content account for the mobile navigation footprint. */
+@media (max-width: 1023px) {
+  html body .account-dialog-backdrop,
+  html body .protected-artwork-modal-backdrop,
+  html body .chat-lightbox-overlay,
+  html body .chat-composer-sheet {
+    z-index: var(--ag-overlay-z-index);
+  }
+
+  html body .account-dialog-backdrop,
+  html body .protected-artwork-modal-backdrop {
+    padding-bottom: calc(20px + var(--ag-overlay-bottom-clearance));
+  }
+
+  html body .account-dialog {
+    max-height: calc(100dvh - 40px - var(--ag-overlay-bottom-clearance));
+  }
+
+  html body .protected-artwork-modal {
+    max-height: min(calc(90dvh - var(--ag-overlay-bottom-clearance)), 860px);
+  }
+
+  html body .chat-composer-sheet {
+    max-height: min(60dvh, calc(100dvh - var(--ag-overlay-bottom-clearance)));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  html body .chat-lightbox-overlay {
+    padding-bottom: calc(32px + var(--ag-overlay-bottom-clearance));
+  }
+
+  html body .chat-lightbox-caption {
+    bottom: calc(28px + var(--ag-overlay-bottom-clearance));
+  }
+
+  ion-modal,
+  ion-alert,
+  ion-action-sheet,
+  ion-popover,
+  ion-loading {
+    --height: min(100dvh, calc(100dvh - var(--ag-overlay-bottom-clearance)));
+    --max-height: calc(100dvh - var(--ag-overlay-bottom-clearance));
+  }
+
+  /* Ionic overlays are portalled outside .app-shell, while page-owned
+     overlays inherit this contract through their shared backdrop selectors. */
+  ion-modal::part(content),
+  ion-alert::part(alert),
+  ion-action-sheet::part(container),
+  ion-popover::part(content),
+  ion-loading::part(loading-wrapper) {
+    max-height: calc(100dvh - var(--ag-overlay-bottom-clearance));
+  }
+}
+
+/* Rendered via ScreenShell's `aside` prop on ChatPage only, wrapping the
+   desktop-only nav rail so it doesn't also show as a real bottom tab bar
+   on ChatPage's mobile layout (which intentionally has none). */
+.chat-page-rail-wrap {
+  display: none;
+}
+
+/* ============ Desktop two-pane Messages ============
+   <ChatSidebar> is rendered via ScreenShell's `aside` prop — i.e. as a
+   real child of .app-shell, INSIDE IonPage — not as an external sibling
+   wrapping ScreenShell. That distinction is what makes it behave: Ionic's
+   page-stack show/hide logic hides the whole `ion-page` when another
+   route becomes active, so anything inside it (including this aside)
+   disappears too. A sibling living outside IonPage never gets touched by
+   that mechanism, which is exactly why it used to bleed into other
+   routes. With the sidebar a real flex child of .app-shell, turning the
+   shell into a row is enough on its own — no fixed/absolute positioning
+   or manual width bookkeeping needed. */
+@media (min-width: 1024px) {
+  .app-shell:has(> .chat-sidebar) {
+    flex-direction: row;
+  }
+
+  .chat-page-rail-wrap {
+    display: contents;
+  }
+}
+
+
+
+/* ============ Sticky bottom action bar (e.g. Book Commission) ============ */
+.sticky-action-bar {
+  padding: 14px 18px max(calc(env(safe-area-inset-bottom, 0px) + 14px), 20px);
+  border-top: 1px solid var(--ag-border-soft);
+  background: var(--ag-sticky-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  flex-shrink: 0;
+}
+
+.sticky-action-price {
+  color: var(--ag-sticky-price);
+}
+
+@media (min-width: 768px) {
+  .sticky-action-bar {
+    padding-left: max(32px, calc((100% - 1096px) / 2));
+    padding-right: max(32px, calc((100% - 1096px) / 2));
+  }
+}
+
+/* ============ Segmented control (role toggle / protection level) ============ */
+.segmented {
+  display: flex;
+  gap: 8px;
+  background: var(--ag-surface-2);
+  padding: 4px;
+  border-radius: var(--ag-r-full);
+}
+.segmented-option {
+  flex: 1;
+  text-align: center;
+  padding: 9px;
+  border-radius: var(--ag-r-full);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ag-text-low);
+  background: none;
+  border: none;
+  transition: background 0.15s, color 0.15s;
+}
+.segmented-option.active {
+  background: var(--ag-grad-primary);
+  color: var(--ag-ink);
+  font-weight: 700;
+}
+
+/* ============ Toast-ish inline banner (mock actions, and genuine
+   real-data feedback via .status-toast e.g. revision requests) ============ */
+.mock-toast,
+.status-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 96px;
+  transform: translateX(-50%);
+  background: var(--ag-surface-3);
+  border: 1px solid var(--ag-border);
+  color: var(--ag-text-hi);
+  padding: 10px 18px;
+  border-radius: var(--ag-r-full);
+  font-size: 12.5px;
+  font-weight: 600;
+  box-shadow: var(--ag-shadow-card);
+  z-index: 200;
+  white-space: nowrap;
+  max-width: 90vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.status-toast.is-error {
+  background: rgba(248, 113, 113, 0.15);
+  border-color: rgba(248, 113, 113, 0.35);
+  color: var(--ag-danger);
+  white-space: normal;
+}
+
+/* Mobile toasts share the page shell's measured navigation footprint. Keep
+   the existing desktop and no-nav position, while adding a small clear gap
+   above the floating capsule when it is present. */
+@media (max-width: 1023px) {
+  .mock-toast,
+  .status-toast {
+    bottom: max(96px, calc(var(--ag-bottom-nav-space, 0px) + 16px));
+  }
+}
+
+/* Generic tappable card affordance — combine with `.card`/`.card-glass`.
+   Deliberately does NOT touch background/border/padding/display so those
+   classes' own styling wins; `.card` etc. already override the <button> UA
+   defaults for background/border/padding regardless of source order, and
+   omitting `display` here lets `.row-between`/`.row` still apply flex when
+   combined (a <button> defaults to inline-block, and width:100% makes that
+   behave like a block for layout purposes when used alone). */
+.tap-card {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+/* ============ Reusable responsive card list ============
+   A handful of screens (profile requests, pricing tiers, etc.) render a
+   simple stacked list of full-width cards — fine on a phone-width column,
+   but the same "one very wide, very thin card after another" problem as
+   Marketplace/Messages once the shell is a real desktop-width column.
+   Opt any such list into this utility instead of a bare flex column. */
+.stack-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (min-width: 900px) {
+  .stack-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 14px;
+  }
+}

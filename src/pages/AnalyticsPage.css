@@ -1,0 +1,217 @@
+.app-content-inner.analytics-page-content {
+  width: min(100%, 760px);
+  min-width: 0;
+}
+
+.analytics-page-header {
+  gap: 12px;
+}
+
+.analytics-page-header > .row {
+  min-width: 0;
+}
+
+.analytics-page-header .h-title {
+  color: var(--ag-text-hi);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 20px !important;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.analytics-period-chip {
+  flex: 0 0 auto;
+  min-height: 36px;
+}
+
+.analytics-dashboard {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding-bottom: 8px;
+}
+
+.analytics-dashboard .card {
+  min-width: 0;
+  margin: 0 !important;
+  border-radius: var(--ag-r-lg);
+}
+
+.analytics-revenue-card {
+  padding: 19px;
+  border-color: color-mix(in srgb, var(--ag-primary-deep) 30%, transparent);
+  background: var(--ag-grad-primary);
+  box-shadow: 0 12px 28px rgba(201, 147, 42, 0.2);
+  color: var(--ag-ink);
+}
+
+.analytics-empty-state-card {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--ag-border) 80%, transparent);
+  background: var(--ag-surface-2);
+  box-shadow: none;
+  color: var(--ag-text-hi);
+}
+
+.analytics-revenue-card .c-low,
+.analytics-revenue-card .c-mid {
+  color: rgba(22, 33, 59, 0.72);
+}
+
+.analytics-revenue-card .mono {
+  overflow-wrap: anywhere;
+  font-size: clamp(25px, 8vw, 31px) !important;
+}
+
+.analytics-chart-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 74px;
+  margin-top: 14px;
+  border-radius: 12px;
+  border: 1px dashed var(--ag-border);
+  background: rgba(22, 33, 59, 0.04);
+  color: var(--ag-text-low);
+  text-align: center;
+  font-size: 12px;
+}
+
+.analytics-revenue-chart {
+  margin-top: 14px;
+  background: rgba(22, 33, 59, 0.08);
+  border: 1px solid rgba(22, 33, 59, 0.12);
+}
+
+.analytics-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.analytics-metric-card {
+  padding: 14px;
+  min-height: 82px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-color: var(--ag-border-soft);
+  background: var(--ag-surface);
+  box-shadow: var(--ag-shadow-card);
+}
+
+.analytics-metric-card .mono {
+  color: var(--ag-text-hi);
+  font-size: 21px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.analytics-metric-card .t-xs {
+  margin-top: 4px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.analytics-section-title {
+  margin: 4px 0 -2px !important;
+  font-size: 15px;
+}
+
+.analytics-month-chart-card,
+.analytics-feedback-card,
+.analytics-security-card {
+  padding: 17px;
+  border-color: var(--ag-border-soft);
+  background: var(--ag-surface);
+  box-shadow: var(--ag-shadow-card);
+}
+
+.analytics-month-chart-card > .section-title,
+.analytics-security-card > .row-between {
+  margin-bottom: 12px !important;
+}
+
+.analytics-month-chart-card > div[style*="overflow-x"] {
+  max-width: 100%;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
+.analytics-month-chart-card > div[style*="overflow-x"] > div {
+  flex: 0 0 clamp(30px, 10vw, 42px) !important;
+}
+
+.analytics-month-chart-card > div[style*="overflow-x"] > div > div:last-child {
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.analytics-security-card {
+  border-top: 2px solid var(--ag-primary);
+}
+
+.analytics-security-card svg {
+  display: block;
+  max-width: 100%;
+}
+
+.analytics-log-heading {
+  margin: 4px 0 -2px !important;
+}
+
+.analytics-blocked-log {
+  min-width: 0;
+}
+
+.analytics-blocked-log > .row-between {
+  min-width: 0;
+  gap: 10px;
+}
+
+.analytics-blocked-log .row {
+  min-width: 0;
+}
+
+.analytics-blocked-log .t-xs {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 390px) {
+  .app-content-inner.analytics-page-content {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .analytics-page-header {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .analytics-period-chip {
+    gap: 4px !important;
+    padding: 6px 9px;
+    font-size: 11px;
+  }
+
+  .analytics-metric-grid {
+    gap: 8px;
+  }
+
+  .analytics-metric-card {
+    padding: 12px;
+  }
+}
+
+@media (min-width: 768px) {
+  .analytics-dashboard {
+    gap: 16px;
+  }
+
+  .analytics-metric-card {
+    min-height: 96px;
+    padding: 18px;
+  }
+}

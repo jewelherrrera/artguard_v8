@@ -1,0 +1,25 @@
+ArtGuard Hub — Messenger-style direct chat final fix
+
+What this fixes:
+- Duplicate 1-to-1 conversations caused by concurrent/repeated starts are merged by the SQL migration; future creation uses an advisory lock.
+- Incoming messages appear in the other user inbox immediately through Supabase Realtime/broadcast.
+- Unread badge remains until the receiver opens the conversation.
+- Opening a conversation marks incoming messages as read and sends a read receipt back to the sender.
+- Sender shows ✓, ✓✓, and Seen on the most recent outgoing message after it is read.
+- Typing indicator is sent live while the composer contains text and clears after a short idle period.
+- Reactions update locally, persist via RPC, and sync to the other user.
+- Browser notifications are requested once and shown when permission is granted; unread state still works when notifications are blocked.
+- Presence keeps Active now based on realtime presence plus last_seen_at heartbeat.
+
+Supabase steps:
+1. Open supabase/fix-direct-chat.sql in Supabase SQL Editor.
+2. Click Run once. You do not need to delete old saved SQL tabs.
+3. Then restart Vite.
+
+Recommended test:
+- Open Account A and Account B in two separate browsers/incognito windows.
+- A opens B and sends a message.
+- B should see the conversation row, unread badge, and message without refreshing.
+- When B opens the conversation, A should see Seen.
+- While B types, A should see “B is typing…”.
+- React to a message and verify the reaction appears on both browsers.

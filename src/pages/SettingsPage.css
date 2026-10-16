@@ -1,0 +1,63 @@
+/* Settings list rows use a dedicated glass surface so shared app surfaces
+   and unrelated tappable cards keep their existing theme treatment. */
+:root,
+[data-theme='light'] {
+  --ag-settings-row-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(240, 241, 236, 0.86));
+  --ag-settings-row-hover: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(226, 238, 246, 0.92));
+  --ag-settings-icon-bg: rgba(46, 134, 201, 0.1);
+  --ag-settings-row-text: var(--ag-text-hi);
+  --ag-settings-row-muted: var(--ag-text-mid);
+  --ag-settings-row-border: var(--ag-border-soft);
+}
+
+[data-theme='dark'] {
+  --ag-settings-row-bg: linear-gradient(135deg, rgba(30, 58, 95, 0.9), rgba(20, 38, 70, 0.92));
+  --ag-settings-row-hover: linear-gradient(135deg, rgba(39, 83, 127, 0.96), rgba(27, 57, 96, 0.96));
+  --ag-settings-icon-bg: rgba(46, 134, 201, 0.22);
+  --ag-settings-row-text: #f5f1e6;
+  --ag-settings-row-muted: #b7c5dc;
+  --ag-settings-row-border: rgba(255, 255, 255, 0.1);
+}
+
+.settings-row {
+  min-height: 64px;
+  color: var(--ag-settings-row-text);
+  background: var(--ag-settings-row-bg);
+  border: 1px solid var(--ag-settings-row-border);
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 5px 16px rgba(8, 21, 43, 0.14);
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.settings-row + .soft {
+  opacity: 0.55;
+}
+
+.settings-row .t-sm {
+  color: var(--ag-settings-row-text);
+}
+
+.settings-row .c-low {
+  color: var(--ag-settings-row-muted);
+}
+
+.settings-row .icon {
+  stroke: var(--ag-accent-soft);
+}
+
+.settings-row > .row > div:first-child {
+  border: 1px solid rgba(126, 190, 235, 0.14);
+}
+
+.settings-row.tap-card:hover {
+  background: var(--ag-settings-row-hover);
+  border-color: rgba(126, 190, 235, 0.42);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 8px 20px rgba(8, 21, 43, 0.2);
+}
+
+.settings-row.tap-card:focus-visible,
+.settings-row.tap-card:active {
+  outline: none;
+  border-color: var(--ag-primary);
+  box-shadow: 0 0 0 3px rgba(232, 178, 61, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}

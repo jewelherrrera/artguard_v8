@@ -1,0 +1,25 @@
+/* ============================================================
+   P22 Vincent — decorative/display typeface (Vincent van Gogh's
+   handwriting, P22 type foundry). Registered here as a proper
+   @font-face so it can be referenced by name anywhere in the
+   theme, the same way 'Space Grotesk' / 'Inter' are loaded via
+   Google Fonts in index.html.
+
+   Used ONLY for ArtGuard Hub's artistic identity moments: the
+   splash/brand title, primary page headings (.h-title), and the
+   auth/onboarding screen titles (.auth-title) — see global.css
+   and their respective page CSS files. It is a single-weight
+   (Regular) face, so anywhere it's applied the surrounding rule
+   also sets font-weight: 400 to avoid the browser's synthetic
+   ("faux") bold, which distorts script letterforms.
+   ============================================================ */
+
+@font-face {
+  font-family: 'P22 Vincent';
+  src:
+    url('../assets/fonts/P22Vincent-Regular.woff2') format('woff2'),
+    url('../assets/fonts/P22Vincent-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}

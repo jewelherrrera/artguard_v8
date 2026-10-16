@@ -1,0 +1,87 @@
+.artist-verification-page {
+  display: grid;
+  gap: 16px;
+  padding-bottom: 20px;
+}
+
+.artist-verification-intro,
+.artist-verification-state {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.artist-verification-intro p,
+.artist-verification-state p {
+  margin: 5px 0 0;
+  line-height: 1.55;
+}
+
+.artist-verification-rejected {
+  border-color: rgba(248, 113, 113, 0.32);
+}
+
+.artist-verification-form {
+  display: grid;
+  gap: 8px;
+}
+
+.artist-verification-form .section-title {
+  margin-bottom: 0;
+}
+
+.artist-verification-form .field-label {
+  margin-top: 7px;
+}
+
+.artist-verification-input {
+  width: 100%;
+  color: var(--ag-text-hi);
+  background: var(--ag-surface-2);
+  font: inherit;
+}
+
+.artist-verification-form .textarea-field {
+  min-height: 112px;
+}
+
+.artist-verification-samples {
+  display: grid;
+  gap: 5px;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ag-border-soft);
+}
+
+.artist-verification-sample-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 3px;
+}
+
+.artist-verification-success {
+  color: var(--ag-success);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.artist-verification-sample-upload,
+.artist-verification-sample-readonly {
+  display: grid;
+  gap: 7px;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ag-border-soft);
+}
+
+.artist-verification-sample-preview,
+.artist-verification-sample-readonly img {
+  display: block;
+  width: min(100%, 320px);
+  max-height: 220px;
+  object-fit: contain;
+  border: 1px solid var(--ag-border-soft);
+  border-radius: var(--ag-r-sm);
+  background: var(--ag-surface-2);
+}

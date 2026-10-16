@@ -1,0 +1,158 @@
+/* ============================================================
+   ArtworkDetailPage — full artwork view + caption + comments.
+
+   Follows the same "full-bleed media scrolls, back button overlays
+   it" convention as ArtistProfilePage's cover photo.
+   ============================================================ */
+
+.artwork-hero-wrap {
+  position: relative;
+}
+
+.artwork-hero-backbtn-row {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 14px);
+  left: 18px;
+  right: 18px;
+  z-index: 6;
+  display: flex;
+  justify-content: space-between;
+}
+
+.artwork-hero-tile {
+  border-radius: 0;
+}
+
+.artwork-detail-content {
+  padding-top: 18px;
+}
+
+.artwork-detail-like-btn,
+.artwork-detail-comment-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 14px;
+}
+
+.artwork-detail-like-btn:active,
+.artwork-detail-comment-btn:active {
+  transform: scale(0.96);
+}
+
+.comment-item {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.comment-bubble {
+  flex: 1;
+  min-width: 0;
+}
+
+.comment-composer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px max(calc(env(safe-area-inset-bottom, 0px) + 12px), 16px);
+  border-top: 1px solid var(--ag-border-soft);
+  flex-shrink: 0;
+}
+
+.comment-send-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--ag-grad-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: none;
+  padding: 0;
+}
+
+.comment-send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (min-width: 768px) {
+  .comment-composer {
+    padding-left: max(32px, calc((100% - 1096px) / 2));
+    padding-right: max(32px, calc((100% - 1096px) / 2));
+  }
+}
+
+/* ============ Desktop two-pane artwork view ============
+   Mobile/tablet: hero image scrolls full-bleed above the info block,
+   unchanged. Desktop: the artwork gets a proper "media viewer" layout
+   instead — a large image pane that stays put (position: sticky) while a
+   fixed-width sidebar with the author/caption/comments scrolls next to
+   it, matching how a media viewer like Facebook's photo view relates the
+   image to its details instead of stacking a full-bleed image above a
+   centered text column. */
+@media (min-width: 1024px) {
+  .artwork-detail-shell {
+    display: flex;
+    align-items: flex-start;
+  }
+
+  .artwork-hero-wrap {
+    flex: 1 1 0;
+    min-width: 0;
+    position: sticky;
+    top: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100dvh;
+    padding: 32px;
+    background: var(--ag-bg-2);
+  }
+
+  .artwork-hero-tile {
+    /* Width is the definite dimension here — computed as "whichever is
+       smaller: the pane's available width, or the width that would make
+       the height exactly hit its cap given the aspect ratio" — then height
+       derives from that width via aspect-ratio. A plain (non-replaced,
+       empty) div with BOTH width:auto and height:auto has no content to
+       size from, so aspect-ratio alone can't produce a non-zero box; one
+       axis has to be definite, which is why this isn't width:auto. */
+    width: min(100%, calc((100dvh - 64px) * var(--hero-ar))) !important;
+    height: auto !important;
+    max-height: calc(100dvh - 64px);
+    aspect-ratio: var(--hero-ar) !important;
+    border-radius: var(--ag-r-lg);
+  }
+
+  .artwork-hero-backbtn-row {
+    left: 24px;
+    right: 24px;
+  }
+
+  /* Override the shared .app-content-inner sizing (a 3-class selector so
+     it wins regardless of the generic width tiers' source order) — this
+     becomes a fixed-width sidebar instead of a centered reading column. */
+  .artwork-detail-shell .app-content-inner.artwork-detail-content {
+    width: 440px;
+    max-width: 440px;
+    flex: none;
+    margin: 0;
+    padding: 32px 32px 40px;
+  }
+
+  /* The comment composer is ScreenShell's fixed footer, spanning the full
+     frame width by default — confine it to sit under the sidebar only,
+     matching the sidebar's fixed width and right alignment. */
+  .comment-composer {
+    width: 440px;
+    margin-left: auto;
+    padding-left: 32px;
+    padding-right: 32px;
+  }
+}

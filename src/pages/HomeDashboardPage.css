@@ -1,0 +1,416 @@
+/* ============================================================
+   HomeDashboardPage — desktop layout.
+
+   Mobile/tablet: single stacked column, unchanged (revenue card ->
+   active commissions -> shield banner -> recent activity, all full
+   width). Desktop: a real dashboard layout — the primary content stays
+   in a wider main column while Recent Activity becomes a narrower side
+   column next to it, instead of one long column of full-width cards
+   stretched across the whole window.
+   ============================================================ */
+
+.dash-main,
+.dash-side {
+  min-width: 0;
+}
+
+.app-content-inner.home-dashboard-content {
+  width: min(100%, 1100px);
+}
+
+.home-dashboard-header {
+  gap: 12px;
+}
+
+.home-dashboard-greeting {
+  min-width: 0;
+}
+
+.home-dashboard-greeting-title {
+  color: var(--ag-text-hi);
+  line-height: 1.2;
+}
+
+.home-dashboard-greeting-subtitle {
+  margin-top: 3px;
+}
+
+.home-revenue-card {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: var(--ag-r-lg);
+  padding: 20px;
+  text-align: left;
+  box-shadow: var(--ag-shadow-glow);
+}
+
+.home-revenue-card .mono {
+  overflow-wrap: anywhere;
+  font-size: clamp(22px, 7vw, 30px) !important;
+  line-height: 1.15;
+}
+
+.home-revenue-chart {
+  position: relative;
+  width: 100%;
+  height: 56px;
+  margin-top: 12px;
+  border-radius: 12px;
+  background: rgba(22, 33, 59, 0.08);
+  border: 1px solid rgba(22, 33, 59, 0.12);
+  overflow: hidden;
+}
+
+.home-revenue-graph-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.home-revenue-graph-svg path {
+  fill: none;
+  stroke: rgba(22, 33, 59, 0.8);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.home-revenue-chart-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(22, 33, 59, 0.72);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.home-commissions-heading {
+  min-width: 0;
+  gap: 10px;
+}
+
+.home-commissions-heading > div,
+.home-commissions-heading .section-title {
+  min-width: 0;
+}
+
+.home-commission-card {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding: 14px 16px;
+  border-radius: var(--ag-r-md);
+  text-align: left;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.home-commission-card:active {
+  transform: scale(0.99);
+}
+
+.home-commission-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+
+.home-commission-card-body {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.home-commission-card .row-between {
+  min-width: 0;
+  gap: 8px;
+}
+
+.home-commission-card .row-between > :first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.home-commission-title {
+  display: block;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.home-commission-meta {
+  color: var(--ag-text-low);
+  font-size: 11px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.home-commission-progress-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.home-commission-card .progress-track {
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(22, 33, 59, 0.08);
+  overflow: hidden;
+}
+
+.home-commission-card .progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--ag-success);
+}
+
+.home-commission-compact-due {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--ag-text-low);
+  overflow-wrap: anywhere;
+}
+
+.home-commission-card .badge {
+  white-space: nowrap;
+}
+
+.home-incoming-request-card {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.home-request-actions {
+  align-items: stretch;
+}
+
+.home-request-actions .btn {
+  min-width: 0;
+  white-space: normal;
+}
+
+.home-shield-card {
+  min-width: 0;
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  border-color: rgba(52, 211, 153, 0.25);
+  background: rgba(18, 32, 44, 0.42);
+}
+
+.home-shield-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(52, 211, 153, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.home-activity-card {
+  min-width: 0;
+}
+
+.home-activity-card > .row-between {
+  margin-bottom: 12px;
+}
+
+.home-activity-card .t-xs {
+  overflow-wrap: anywhere;
+}
+
+/* Greeting avatar: same 44px circular badge as before (.avatar.avatar-md),
+   just showing the brand mark instead of the user's initial. */
+.dash-brand-avatar-logo {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.home-notification-anchor {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.notification-preview {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 60;
+  width: min(360px, calc(100vw - 32px));
+  max-height: min(520px, calc(100vh - 120px));
+  overflow: hidden;
+  border: 1px solid var(--ag-glass-border);
+  border-radius: var(--ag-r-lg);
+  background: color-mix(in srgb, var(--ag-surface) 88%, transparent);
+  box-shadow: 0 18px 50px rgba(3, 5, 16, 0.28);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.notification-preview-header,
+.notification-preview-view-all {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 15px;
+}
+
+.notification-preview-header {
+  border-bottom: 1px solid var(--ag-border-soft);
+}
+
+.notification-preview-list {
+  max-height: 390px;
+  overflow-y: auto;
+}
+
+.notification-preview-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 15px;
+  border: 0;
+  border-bottom: 1px solid var(--ag-border-soft);
+  color: var(--ag-text-hi);
+  background: transparent;
+  text-align: left;
+}
+
+.notification-preview-item:hover,
+.notification-preview-item.is-unread {
+  background: var(--ag-surface-2);
+}
+
+.notification-preview-item > .icon {
+  width: 17px;
+  height: 17px;
+  margin-top: 2px;
+  color: var(--ag-accent);
+}
+
+.notification-preview-item-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.notification-preview-item-title,
+.notification-preview-item-message {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notification-preview-item-title {
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.notification-preview-item-message,
+.notification-preview-item-time {
+  color: var(--ag-text-low);
+  font-size: 11px;
+}
+
+.notification-preview-unread {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--ag-accent);
+}
+
+.notification-preview-empty {
+  padding: 24px 15px;
+  text-align: center;
+}
+
+.notification-preview-view-all {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--ag-border-soft);
+  color: var(--ag-accent);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.notification-preview-view-all .icon {
+  width: 15px;
+  height: 15px;
+}
+
+@media (max-width: 767px) {
+  .notification-preview {
+    display: none;
+  }
+
+  .home-dashboard-header {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 18px);
+    padding-bottom: 16px;
+  }
+
+  .app-content-inner.home-dashboard-content {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .home-revenue-card {
+    padding: 18px;
+    margin-bottom: 18px !important;
+  }
+
+  .home-commission-card {
+    margin-bottom: 10px !important;
+  }
+
+  .home-activity-card {
+    padding: 16px;
+    border: 1px solid var(--ag-border-soft);
+    border-radius: var(--ag-r-md);
+    background: var(--ag-glass-bg);
+  }
+
+  .home-request-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .app-content-inner.home-dashboard-content {
+    width: min(100%, 1400px);
+  }
+
+  .dash-grid {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    align-items: start;
+    gap: 28px;
+  }
+
+  .dash-side {
+    position: sticky;
+    top: 8px;
+    background: var(--ag-surface);
+    border: 1px solid var(--ag-border-soft);
+    border-radius: var(--ag-r-md);
+    padding: 18px;
+  }
+}
