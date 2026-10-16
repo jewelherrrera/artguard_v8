@@ -13,6 +13,12 @@
 
 :root {
   /* -------- Shape tokens (identical in both themes) -------- */
+  --ag-space-1: 4px;
+  --ag-space-2: 8px;
+  --ag-space-3: 12px;
+  --ag-space-4: 16px;
+  --ag-space-5: 20px;
+  --ag-space-6: 24px;
   --ag-r-xs: 8px;
   --ag-r-sm: 12px;
   --ag-r-md: 16px;
@@ -21,42 +27,50 @@
   --ag-r-full: 999px;
 
   /* -------- Brand tokens (identical in both themes) -------- */
-  --ag-primary: #e8b23d;
-  --ag-primary-deep: #c9932a;
-  --ag-secondary: #1d5c8c;
-  --ag-sky: #2e86c9;
-  --ag-plum: #6c6470;
+  --ag-primary: #f6c453;
+  --ag-primary-deep: #c88a21;
+  --ag-secondary: #2856a6;
+  --ag-sky: #72adff;
+  --ag-plum: #526a91;
   --ag-teal: #2dd4bf;
   --ag-coral: #fb7185;
-  --ag-amber: #e8b23d;
-  --ag-ink: #16213b;
-  --ag-grad-primary: linear-gradient(135deg, #e8b23d 0%, #c9932a 100%);
-  --ag-grad-accent: linear-gradient(135deg, #1d5c8c 0%, #2e86c9 100%);
+  --ag-amber: #e5a52d;
+  --ag-ink: #0b1224;
+  --ag-grad-primary: linear-gradient(135deg, #ffe38a 0%, #f6c453 55%, #e5a52d 100%);
+  --ag-grad-accent: linear-gradient(135deg, #2856a6 0%, #397bc9 62%, #72adff 100%);
+  --ag-transition-fast: 140ms ease;
+  --ag-transition-base: 200ms ease;
+  --ag-grad-bg-night: radial-gradient(ellipse 122% 96% at 10% -12%, rgba(59, 111, 205, 0.38) 0%, rgba(47, 82, 163, 0.2) 40%, transparent 76%),
+    radial-gradient(ellipse 98% 82% at 100% 28%, rgba(47, 81, 159, 0.28) 0%, transparent 78%),
+    radial-gradient(ellipse 86% 92% at 54% 50%, rgba(65, 74, 151, 0.16) 0%, transparent 80%),
+    radial-gradient(ellipse 98% 76% at 42% 112%, rgba(31, 67, 142, 0.32) 0%, transparent 74%),
+    radial-gradient(ellipse 52% 40% at 94% 0%, rgba(229, 165, 45, 0.105) 0%, transparent 80%),
+    linear-gradient(160deg, #0b1224 0%, #0f1b35 50%, #0a1328 100%);
 
   /* -------- Ionic core mappings (theme-reactive via var() indirection) -------- */
   --ion-color-primary: var(--ag-primary);
-  --ion-color-primary-rgb: 232, 178, 61;
+  --ion-color-primary-rgb: 246, 196, 83;
   --ion-color-primary-contrast: var(--ag-ink);
-  --ion-color-primary-contrast-rgb: 22, 33, 59;
+  --ion-color-primary-contrast-rgb: 11, 18, 36;
   --ion-color-primary-shade: var(--ag-primary-deep);
-  --ion-color-primary-tint: #ecbd57;
+  --ion-color-primary-tint: #ffe38a;
 
   --ion-color-secondary: var(--ag-secondary);
-  --ion-color-secondary-rgb: 29, 92, 140;
+  --ion-color-secondary-rgb: 40, 86, 166;
   --ion-color-secondary-contrast: #ffffff;
   --ion-color-secondary-contrast-rgb: 255, 255, 255;
-  --ion-color-secondary-shade: #19517b;
-  --ion-color-secondary-tint: #336d98;
+  --ion-color-secondary-shade: #1f478b;
+  --ion-color-secondary-tint: #4774bc;
 
   --ion-color-danger: var(--ag-danger);
   --ion-color-danger-contrast: var(--ag-ink);
-  --ion-color-danger-contrast-rgb: 22, 33, 59;
+  --ion-color-danger-contrast-rgb: 11, 18, 36;
   --ion-color-danger-shade: #da6363;
   --ion-color-danger-tint: #f97f7f;
 
   --ion-color-success: var(--ag-success);
   --ion-color-success-contrast: var(--ag-ink);
-  --ion-color-success-contrast-rgb: 22, 33, 59;
+  --ion-color-success-contrast-rgb: 11, 18, 36;
   --ion-color-success-shade: #2eba87;
   --ion-color-success-tint: #48d7a3;
 
@@ -73,73 +87,88 @@
    ============================================================ */
 :root,
 [data-theme='light'] {
-  --ag-bg: #f7f6f1;
-  --ag-bg-2: #ffffff;
+  --ag-bg: #f3f6fb;
+  --ag-bg-2: #fbfcff;
   --ag-surface: #ffffff;
-  --ag-surface-2: #f0f1ec;
-  --ag-surface-3: #e4e7ef;
-  --ag-border: rgba(29, 92, 140, 0.2);
-  --ag-border-soft: rgba(22, 33, 59, 0.09);
-  --ag-accent: #93670f;
-  --ag-accent-soft: #a97a1c;
+  --ag-surface-2: #edf2f9;
+  --ag-surface-3: #e0e8f3;
+  --ag-border: rgba(40, 86, 166, 0.2);
+  --ag-border-soft: rgba(22, 40, 75, 0.1);
+  --ag-accent: #80570d;
+  --ag-accent-soft: #94670f;
   --ag-success: #14966d;
-  --ag-warning: #a6740f;
+  --ag-warning: #93620f;
   --ag-danger: #d64545;
-  --ag-text-hi: #16213b;
-  --ag-text-mid: #4d5b73;
-  --ag-text-low: #7c869a;
+  --ag-text-hi: #14213a;
+  --ag-text-mid: #4f607c;
+  --ag-text-low: #71819a;
 
-  --ag-grad-bg: radial-gradient(120% 90% at 15% -10%, rgba(46, 134, 201, 0.12) 0%, transparent 55%),
-    radial-gradient(90% 70% at 100% 0%, rgba(232, 178, 61, 0.16) 0%, transparent 42%);
+  --ag-grad-bg: radial-gradient(105% 72% at 14% -12%, rgba(69, 125, 202, 0.13) 0%, transparent 58%),
+    radial-gradient(70% 48% at 96% 0%, rgba(246, 196, 83, 0.11) 0%, transparent 58%),
+    linear-gradient(180deg, #f3f6fb 0%, #f6f8fc 60%, #f1f4f9 100%);
+  --ag-grad-bg-feature: radial-gradient(ellipse 118% 88% at 8% -12%, rgba(54, 105, 190, 0.19) 0%, rgba(71, 114, 188, 0.08) 38%, transparent 75%),
+    radial-gradient(ellipse 88% 72% at 100% 24%, rgba(40, 86, 166, 0.13) 0%, transparent 78%),
+    radial-gradient(ellipse 82% 68% at 44% 112%, rgba(40, 86, 166, 0.09) 0%, transparent 76%),
+    radial-gradient(ellipse 50% 42% at 94% 3%, rgba(229, 165, 45, 0.08) 0%, transparent 78%),
+    linear-gradient(160deg, #f0f4fb 0%, #f6f8fc 52%, #eff3fa 100%);
+  --ag-grad-surface: linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(247, 250, 255, 0.96));
 
-  --ag-shadow-card: 0 6px 20px rgba(22, 33, 59, 0.08);
-  --ag-shadow-glow: 0 0 0 1px rgba(29, 92, 140, 0.14), 0 12px 32px rgba(29, 92, 140, 0.14);
+  --ag-shadow-card: 0 8px 24px rgba(23, 47, 88, 0.075), 0 1px 3px rgba(23, 47, 88, 0.045);
+  --ag-shadow-glow: 0 0 0 1px rgba(40, 86, 166, 0.12), 0 14px 34px rgba(40, 86, 166, 0.12);
 
   /* "Glass" card surface (used for callouts like the Shield Active card and
      revision-request chat bubbles). Must stay theme-reactive: a translucent
      dark panel reads fine in dark mode but hides dark-navy light-mode text. */
-  --ag-glass-bg: rgba(255, 255, 255, 0.72);
-  --ag-glass-border: rgba(22, 33, 59, 0.1);
-  --ag-sticky-bg: rgba(255, 255, 255, 0.92);
-  --ag-sticky-price: #16213b;
+  --ag-glass-bg: rgba(250, 252, 255, 0.82);
+  --ag-glass-border: rgba(40, 66, 112, 0.13);
+  --ag-sticky-bg: rgba(250, 252, 255, 0.94);
+  --ag-sticky-price: #14213a;
+  --ag-settings-icon-bg: rgba(40, 86, 166, 0.1);
 
-  --ion-background-color-rgb: 247, 246, 241;
-  --ion-text-color-rgb: 22, 33, 59;
+  --ion-background-color-rgb: 243, 246, 251;
+  --ion-text-color-rgb: 20, 33, 58;
   color-scheme: light;
 }
 
 /* ============================================================
-   DARK THEME — ported 1:1 from artguard-hub-ui-mockups.html.
+   DARK THEME — deep blue surfaces with diffuse Starry Night light.
    ============================================================ */
 [data-theme='dark'] {
-  --ag-bg: #0e1526;
-  --ag-bg-2: #121b30;
-  --ag-surface: #1a2540;
-  --ag-surface-2: #223255;
-  --ag-surface-3: #2b3d63;
-  --ag-border: rgba(232, 178, 61, 0.16);
-  --ag-border-soft: rgba(255, 255, 255, 0.07);
-  --ag-accent: #f2d98c;
-  --ag-accent-soft: #f7e3ac;
+  --ag-bg: #0b1224;
+  --ag-bg-2: #101a31;
+  --ag-surface: #172542;
+  --ag-surface-2: #203253;
+  --ag-surface-3: #2a4169;
+  --ag-border: rgba(114, 173, 255, 0.2);
+  --ag-border-soft: rgba(205, 222, 252, 0.09);
+  --ag-accent: #ffe38a;
+  --ag-accent-soft: #f6c453;
   --ag-success: #34d399;
-  --ag-warning: #e8b23d;
+  --ag-warning: #f6c453;
   --ag-danger: #f87171;
-  --ag-text-hi: #f5f1e6;
-  --ag-text-mid: #aebeda;
-  --ag-text-low: #78889f;
+  --ag-text-hi: #f5f7fc;
+  --ag-text-mid: #b5c2d9;
+  --ag-text-low: #8d9bb4;
 
-  --ag-grad-bg: radial-gradient(120% 90% at 15% -10%, #1e3a5f 0%, #0e1526 55%),
-    radial-gradient(90% 70% at 100% 0%, rgba(201, 147, 42, 0.5) 0%, transparent 38%);
+  --ag-grad-bg: radial-gradient(ellipse 118% 92% at 8% -12%, rgba(48, 94, 184, 0.3) 0%, rgba(44, 76, 151, 0.14) 38%, transparent 76%),
+    radial-gradient(ellipse 92% 78% at 100% 28%, rgba(37, 71, 146, 0.2) 0%, transparent 78%),
+    radial-gradient(ellipse 82% 92% at 54% 50%, rgba(59, 68, 139, 0.1) 0%, transparent 80%),
+    radial-gradient(ellipse 92% 74% at 40% 112%, rgba(30, 62, 130, 0.22) 0%, transparent 76%),
+    radial-gradient(ellipse 54% 42% at 94% 2%, rgba(229, 165, 45, 0.075) 0%, transparent 80%),
+    linear-gradient(160deg, #0b1224 0%, #0e1830 50%, #0a1328 100%);
+  --ag-grad-bg-feature: var(--ag-grad-bg-night);
+  --ag-grad-surface: linear-gradient(145deg, rgba(32, 50, 83, 0.92), rgba(23, 37, 66, 0.98));
 
-  --ag-shadow-card: 0 8px 24px rgba(3, 5, 16, 0.45);
-  --ag-shadow-glow: 0 0 0 1px rgba(232, 178, 61, 0.15), 0 12px 32px rgba(29, 92, 140, 0.35);
+  --ag-shadow-card: 0 10px 26px rgba(2, 8, 22, 0.32), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --ag-shadow-glow: 0 0 0 1px rgba(114, 173, 255, 0.12), 0 14px 34px rgba(8, 25, 56, 0.42);
 
-  --ag-glass-bg: rgba(30, 39, 67, 0.55);
-  --ag-glass-border: rgba(255, 255, 255, 0.08);
-  --ag-sticky-bg: rgba(15, 20, 40, 0.9);
-  --ag-sticky-price: #ffffff;
+  --ag-glass-bg: rgba(16, 26, 49, 0.78);
+  --ag-glass-border: rgba(192, 215, 255, 0.12);
+  --ag-sticky-bg: rgba(12, 21, 40, 0.92);
+  --ag-sticky-price: #f5f7fc;
+  --ag-settings-icon-bg: rgba(114, 173, 255, 0.13);
 
-  --ion-background-color-rgb: 14, 21, 38;
-  --ion-text-color-rgb: 245, 241, 230;
+  --ion-background-color-rgb: 11, 18, 36;
+  --ion-text-color-rgb: 245, 247, 252;
   color-scheme: dark;
 }

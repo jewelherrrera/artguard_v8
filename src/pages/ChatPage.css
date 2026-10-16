@@ -46,6 +46,12 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+  background: var(--ag-glass-bg);
+  border: 1px solid var(--ag-glass-border);
+  border-radius: var(--ag-r-md);
+  box-shadow: var(--ag-shadow-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .chat-thread-content,
@@ -116,6 +122,9 @@
   color: var(--ag-text-hi);
 }
 .chat-menu-item:active {
+  background: var(--ag-surface-2);
+}
+.chat-menu-item:hover {
   background: var(--ag-surface-2);
 }
 .chat-menu-item:disabled {
@@ -258,6 +267,9 @@
   gap: 8px;
   padding: 12px 16px max(calc(env(safe-area-inset-bottom, 0px) + 12px), 16px);
   border-top: 1px solid var(--ag-border-soft);
+  background: var(--ag-sticky-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   flex-shrink: 0;
 }
 

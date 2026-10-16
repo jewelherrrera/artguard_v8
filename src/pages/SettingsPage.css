@@ -2,21 +2,21 @@
    and unrelated tappable cards keep their existing theme treatment. */
 :root,
 [data-theme='light'] {
-  --ag-settings-row-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(240, 241, 236, 0.86));
-  --ag-settings-row-hover: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(226, 238, 246, 0.92));
-  --ag-settings-icon-bg: rgba(46, 134, 201, 0.1);
+  --ag-settings-row-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(238, 243, 251, 0.9));
+  --ag-settings-row-hover: linear-gradient(135deg, #ffffff, rgba(226, 236, 250, 0.96));
+  --ag-settings-icon-bg: rgba(40, 86, 166, 0.1);
   --ag-settings-row-text: var(--ag-text-hi);
   --ag-settings-row-muted: var(--ag-text-mid);
   --ag-settings-row-border: var(--ag-border-soft);
 }
 
 [data-theme='dark'] {
-  --ag-settings-row-bg: linear-gradient(135deg, rgba(30, 58, 95, 0.9), rgba(20, 38, 70, 0.92));
-  --ag-settings-row-hover: linear-gradient(135deg, rgba(39, 83, 127, 0.96), rgba(27, 57, 96, 0.96));
-  --ag-settings-icon-bg: rgba(46, 134, 201, 0.22);
-  --ag-settings-row-text: #f5f1e6;
-  --ag-settings-row-muted: #b7c5dc;
-  --ag-settings-row-border: rgba(255, 255, 255, 0.1);
+  --ag-settings-row-bg: linear-gradient(135deg, rgba(32, 50, 83, 0.94), rgba(20, 33, 59, 0.96));
+  --ag-settings-row-hover: linear-gradient(135deg, rgba(42, 65, 105, 0.98), rgba(25, 45, 79, 0.98));
+  --ag-settings-icon-bg: rgba(114, 173, 255, 0.15);
+  --ag-settings-row-text: #f5f7fc;
+  --ag-settings-row-muted: #b5c2d9;
+  --ag-settings-row-border: rgba(205, 222, 252, 0.1);
 }
 
 .settings-row {
@@ -57,7 +57,6 @@
 
 .settings-row.tap-card:focus-visible,
 .settings-row.tap-card:active {
-  outline: none;
   border-color: var(--ag-primary);
-  box-shadow: 0 0 0 3px rgba(232, 178, 61, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ag-primary) 16%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }

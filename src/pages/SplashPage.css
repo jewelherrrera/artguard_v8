@@ -21,17 +21,18 @@
   text-align: center;
   position: relative;
   overflow: hidden;
-  background: radial-gradient(120% 70% at 50% 0%, #1e3a5f 0%, #0e1526 60%);
+  isolation: isolate;
+  background-color: var(--ag-ink);
+  background-image: var(--ag-grad-bg-night);
   transition: opacity 0.52s ease, transform 0.52s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 .splash-body::before {
   content: '';
   position: absolute;
-  inset: -20%;
+  inset: 0;
   pointer-events: none;
-  background: radial-gradient(circle at 50% 42%, rgba(232, 178, 61, 0.12), transparent 28%);
-  animation: splash-light-drift 9s ease-in-out infinite alternate;
+  background: radial-gradient(ellipse 62% 46% at 50% 44%, rgba(246, 196, 83, 0.045), transparent 100%);
 }
 
 .splash-body.is-exiting {
@@ -42,14 +43,15 @@
 .splash-weave {
   position: absolute;
   inset: 0;
-  opacity: 0.5;
-  background-image: repeating-linear-gradient(135deg, rgba(232, 178, 61, 0.08) 0 2px, transparent 2px 26px),
-    repeating-linear-gradient(45deg, rgba(46, 134, 201, 0.08) 0 2px, transparent 2px 26px);
-  animation: splash-weave-drift 18s linear infinite;
+  z-index: 0;
+  opacity: 0.9;
+  pointer-events: none;
+  background: url('../assets/starry-night-texture.svg') center / cover no-repeat;
 }
 
 .splash-content {
   position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -107,6 +109,7 @@
 
 .splash-footer {
   position: absolute;
+  z-index: 1;
   bottom: 64px;
   display: flex;
   flex-direction: column;
@@ -154,29 +157,10 @@
   }
 }
 
-@keyframes splash-light-drift {
-  from {
-    transform: translate3d(-4%, -2%, 0) scale(0.95);
-  }
-  to {
-    transform: translate3d(4%, 3%, 0) scale(1.08);
-  }
-}
-
-@keyframes splash-weave-drift {
-  from {
-    background-position: 0 0, 0 0;
-  }
-  to {
-    background-position: 52px 52px, -52px 52px;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .splash-body,
   .splash-mark,
   .splash-weave,
-  .splash-body::before,
   .splash-title,
   .splash-tagline,
   .splash-footer {

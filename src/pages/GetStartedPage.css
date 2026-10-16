@@ -10,24 +10,18 @@
   flex-direction: column;
   align-items: center;
   padding: 28px 24px 24px;
-  color: #f5f1e6;
-  background:
-    radial-gradient(90% 80% at 12% 0%, rgba(46, 134, 201, 0.32), transparent 62%),
-    radial-gradient(70% 68% at 90% 96%, rgba(232, 178, 61, 0.18), transparent 65%),
-    #0e1526;
+  color: #f5f7fc;
+  background-color: var(--ag-ink);
+  background-image: var(--ag-grad-bg-night);
 }
 
 .get-started-stars {
   position: fixed;
   inset: 0;
-  opacity: 0.65;
-  background-image:
-    radial-gradient(circle at 18% 22%, rgba(255, 255, 255, 0.82) 0 1px, transparent 1.5px),
-    radial-gradient(circle at 82% 18%, rgba(232, 178, 61, 0.7) 0 1px, transparent 1.5px),
-    radial-gradient(circle at 76% 72%, rgba(255, 255, 255, 0.55) 0 1px, transparent 1.5px),
-    radial-gradient(circle at 28% 82%, rgba(46, 134, 201, 0.8) 0 1px, transparent 1.5px);
-  background-size: 190px 170px, 260px 230px, 220px 190px, 300px 260px;
-  animation: get-started-stars-drift 18s linear infinite;
+  z-index: 0;
+  opacity: 0.92;
+  pointer-events: none;
+  background: url('../assets/starry-night-texture.svg') center / cover no-repeat;
 }
 
 .get-started-glow {
@@ -36,21 +30,19 @@
   aspect-ratio: 1;
   border-radius: 50%;
   pointer-events: none;
-  filter: blur(12px);
-  opacity: 0.38;
-  animation: get-started-glow-float 10s ease-in-out infinite alternate;
+  display: none;
 }
 
 .get-started-glow-one {
   top: 18%;
   left: -150px;
-  background: rgba(46, 134, 201, 0.28);
+  background: color-mix(in srgb, var(--ag-sky) 28%, transparent);
 }
 
 .get-started-glow-two {
   right: -170px;
   bottom: 10%;
-  background: rgba(232, 178, 61, 0.2);
+  background: color-mix(in srgb, var(--ag-primary) 20%, transparent);
   animation-delay: -4s;
 }
 
@@ -76,7 +68,7 @@
   place-items: center;
   border-radius: 13px;
   background: var(--ag-grad-primary);
-  box-shadow: 0 10px 28px rgba(201, 147, 42, 0.28);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--ag-primary-deep) 28%, transparent);
 }
 
 .get-started-logo {
@@ -112,7 +104,7 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: linear-gradient(120deg, rgba(255, 255, 255, 0.11), transparent 28%, transparent 72%, rgba(232, 178, 61, 0.06));
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.11), transparent 28%, transparent 72%, color-mix(in srgb, var(--ag-primary) 6%, transparent));
 }
 
 .get-started-eyebrow,
@@ -128,7 +120,7 @@
   justify-content: center;
   gap: 10px;
   margin-bottom: 20px;
-  color: #f2d98c;
+  color: #ffe38a;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.13em;
@@ -139,7 +131,7 @@
 .get-started-eyebrow-line {
   width: 22px;
   height: 1px;
-  background: rgba(242, 217, 140, 0.6);
+  background: color-mix(in srgb, #ffe38a 60%, transparent);
 }
 
 .get-started-card h1 {
@@ -191,7 +183,7 @@
   height: 6px;
   border-radius: 50%;
   background: var(--ag-primary);
-  box-shadow: 0 0 14px rgba(232, 178, 61, 0.7);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--ag-primary) 70%, transparent);
 }
 
 @keyframes get-started-card-in {
@@ -213,24 +205,6 @@
   to {
     opacity: 1;
     transform: translateY(0);
-  }
-}
-
-@keyframes get-started-stars-drift {
-  from {
-    transform: translate3d(0, 0, 0);
-  }
-  to {
-    transform: translate3d(18px, 12px, 0);
-  }
-}
-
-@keyframes get-started-glow-float {
-  from {
-    transform: translate3d(0, -8px, 0) scale(0.96);
-  }
-  to {
-    transform: translate3d(10px, 10px, 0) scale(1.05);
   }
 }
 

@@ -15,14 +15,31 @@
   --ag-overlay-bottom-clearance: calc(60px + max(10px, env(safe-area-inset-bottom, 0px)) + 16px);
 }
 
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--ag-accent-soft);
+  outline-offset: 3px;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
 html,
 body {
   background: var(--ag-bg);
+  background-image: var(--ag-grad-bg);
   min-height: 100%;
 }
 
 body {
-  transition: background-color 0.2s ease;
+  color: var(--ag-text-hi);
+  transition: background-color var(--ag-transition-base), color var(--ag-transition-base);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 h1,
@@ -44,8 +61,8 @@ button {
 }
 
 ::selection {
-  background: var(--ag-secondary);
-  color: #fff;
+  background: rgba(246, 196, 83, 0.45);
+  color: var(--ag-ink);
 }
 
 .icon {
@@ -101,10 +118,12 @@ button {
 /* ============ Cards ============ */
 .card {
   background: var(--ag-surface);
+  background-image: var(--ag-grad-surface);
   border: 1px solid var(--ag-border-soft);
   border-radius: var(--ag-r-lg);
   padding: 18px;
   box-shadow: var(--ag-shadow-card);
+  transition: border-color var(--ag-transition-base), box-shadow var(--ag-transition-base), transform var(--ag-transition-base);
 }
 
 /* ============ Buttons ============ */
@@ -119,7 +138,7 @@ button {
   font-size: 14.5px;
   padding: 14px 22px;
   width: 100%;
-  transition: opacity 0.2s, transform 0.15s;
+  transition: opacity var(--ag-transition-fast), transform var(--ag-transition-fast), box-shadow var(--ag-transition-base), background-color var(--ag-transition-fast);
   font-family: 'Inter', sans-serif;
 }
 .btn:active {
@@ -133,7 +152,11 @@ button {
 .btn-primary {
   background: var(--ag-grad-primary);
   color: var(--ag-ink);
-  box-shadow: 0 8px 20px rgba(201, 147, 42, 0.4);
+  box-shadow: 0 5px 16px rgba(200, 138, 33, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+.btn-primary:hover:not(:disabled) {
+  box-shadow: 0 8px 22px rgba(200, 138, 33, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.42);
+  transform: translateY(-1px);
 }
 .btn-primary .icon {
   stroke: var(--ag-ink);
@@ -142,6 +165,11 @@ button {
   background: var(--ag-surface-3);
   color: var(--ag-text-hi);
   border: 1px solid var(--ag-border);
+}
+.btn-secondary:hover:not(:disabled),
+.btn-ghost:hover:not(:disabled) {
+  border-color: var(--ag-border);
+  background-color: var(--ag-surface-3);
 }
 .btn-ghost {
   background: transparent;
@@ -182,12 +210,12 @@ button {
   gap: 10px;
   color: var(--ag-text-low);
   font-size: 13.5px;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color var(--ag-transition-fast), box-shadow var(--ag-transition-fast), background-color var(--ag-transition-fast);
   box-sizing: border-box;
 }
 .input-field.is-focused {
-  border-color: var(--ag-primary);
-  box-shadow: 0 0 0 3px rgba(232, 178, 61, 0.14);
+  border-color: var(--ag-accent-soft);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ag-accent-soft) 18%, transparent);
 }
 .input-field.is-error {
   border-color: var(--ag-danger);
@@ -206,6 +234,7 @@ button {
 }
 .input-field input::placeholder {
   color: var(--ag-text-low);
+  opacity: 0.85;
 }
 .input-field button.eye-toggle {
   background: none;
@@ -235,8 +264,8 @@ button {
 }
 .textarea-field:focus {
   outline: none;
-  border-color: var(--ag-primary);
-  box-shadow: 0 0 0 3px rgba(232, 178, 61, 0.14);
+  border-color: var(--ag-accent-soft);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ag-accent-soft) 18%, transparent);
 }
 .field-error {
   display: flex;
@@ -445,6 +474,8 @@ hr.soft {
 }
 .app-shell {
   --ag-bottom-nav-space: 0px;
+  position: relative;
+  isolation: isolate;
   height: 100%;
   min-height: 100dvh;
   display: flex;
@@ -454,12 +485,33 @@ hr.soft {
   max-width: 100%;
   overflow-x: hidden;
 }
+.app-shell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-color: var(--ag-bg);
+  background-image: url('../assets/starry-night-texture.svg'), var(--ag-grad-bg-feature);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+}
+.app-shell > .app-frame,
+.app-shell > .chat-sidebar {
+  position: relative;
+  z-index: 1;
+}
+[data-theme='light'] .app-shell::before {
+  opacity: 0.62;
+}
+.app-shell:has(> .chat-sidebar) > .chat-sidebar {
+  background: color-mix(in srgb, var(--ag-bg-2) 84%, transparent);
+}
 @media (min-width: 768px) {
   .app-shell {
     padding: 0;
-    background-image: var(--ag-grad-bg),
-      radial-gradient(60% 40% at 20% 0%, rgba(29, 92, 140, 0.2) 0%, transparent 60%),
-      radial-gradient(50% 35% at 85% 8%, rgba(232, 178, 61, 0.1) 0%, transparent 60%);
+    background-image: var(--ag-grad-bg);
   }
 }
 .app-frame {
@@ -595,6 +647,12 @@ hr.soft {
   position: relative;
   flex-shrink: 0;
   padding: 0;
+  transition: color var(--ag-transition-fast), background-color var(--ag-transition-fast), border-color var(--ag-transition-fast), transform var(--ag-transition-fast);
+}
+.icon-btn:hover:not(:disabled) {
+  color: var(--ag-text-hi);
+  border-color: var(--ag-border);
+  background: var(--ag-surface-3);
 }
 .icon-btn .icon {
   width: 17px;
@@ -648,6 +706,12 @@ hr.soft {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  background: var(--ag-glass-bg);
+  border: 1px solid var(--ag-glass-border);
+  border-radius: var(--ag-r-md);
+  box-shadow: var(--ag-shadow-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 .options-menu-dropdown-left {
   right: auto;
@@ -666,6 +730,12 @@ hr.soft {
 .options-menu-item:active {
   background: var(--ag-surface-2);
 }
+.options-menu-item:hover {
+  background: var(--ag-surface-2);
+}
+.options-menu-item:hover {
+  background: var(--ag-surface-2);
+}
 
 /* ============ Card glass ============ */
 /* Theme-reactive: light mode gets a light glass panel (dark text stays
@@ -680,6 +750,7 @@ hr.soft {
   border-radius: var(--ag-r-lg);
   padding: 18px;
   color: var(--ag-text-hi);
+  box-shadow: var(--ag-shadow-card);
 }
 
 /* ============ Search bar ============ */
@@ -803,22 +874,22 @@ hr.soft {
   pointer-events: none;
 }
 .art-1 {
-  background: linear-gradient(135deg, #1d5c8c, #e8b23d 85%);
+  background: linear-gradient(135deg, var(--ag-secondary), var(--ag-primary) 85%);
 }
 .art-2 {
-  background: linear-gradient(135deg, #14243b, #2e86c9 75%);
+  background: linear-gradient(135deg, #14243b, var(--ag-sky) 75%);
 }
 .art-3 {
-  background: linear-gradient(135deg, #6c6470, #e8b23d 80%);
+  background: linear-gradient(135deg, var(--ag-plum), var(--ag-primary) 80%);
 }
 .art-4 {
-  background: linear-gradient(135deg, #2e86c9, #f2d98c 85%);
+  background: linear-gradient(135deg, var(--ag-sky), #ffe38a 85%);
 }
 .art-5 {
-  background: linear-gradient(135deg, #1d5c8c, #6c6470 75%);
+  background: linear-gradient(135deg, var(--ag-secondary), var(--ag-plum) 75%);
 }
 .art-6 {
-  background: linear-gradient(135deg, #e8b23d, #1d5c8c 80%);
+  background: linear-gradient(135deg, var(--ag-primary), var(--ag-secondary) 80%);
 }
 .lock-badge {
   position: absolute;
@@ -887,7 +958,7 @@ hr.soft {
   z-index: 0;
   border-radius: var(--ag-r-full);
   background: rgba(255, 255, 255, 0.12);
-  box-shadow: inset 0 1px rgba(255, 255, 255, 0.12), 0 0 18px rgba(232, 178, 61, 0.12);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.12), 0 0 18px color-mix(in srgb, var(--ag-primary) 12%, transparent);
   pointer-events: none;
 }
 .nav-item-content {
@@ -914,7 +985,7 @@ hr.soft {
 }
 .nav-item.active .icon {
   stroke: var(--ag-accent-soft);
-  filter: drop-shadow(0 0 6px rgba(232, 178, 61, 0.6));
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--ag-primary) 60%, transparent));
 }
 .nav-icon-wrap {
   position: relative;
@@ -1220,6 +1291,7 @@ hr.soft {
   text-align: left;
   font: inherit;
   color: inherit;
+  transition: background-color var(--ag-transition-fast), border-color var(--ag-transition-fast), box-shadow var(--ag-transition-base), transform var(--ag-transition-fast);
 }
 
 /* ============ Reusable responsive card list ============
@@ -1239,5 +1311,16 @@ hr.soft {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
