@@ -1,30 +1,59 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { FormEvent, MouseEvent as ReactMouseEvent } from 'react';
+import type { ChangeEvent, FormEvent, MouseEvent as ReactMouseEvent } from 'react';
 import { useIonViewDidEnter, useIonViewWillLeave } from '@ionic/react';
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ScreenShell } from '../components/ui/ScreenShell';
 import { BottomNav } from '../components/ui/BottomNav';
 import { IconButton } from '../components/ui/IconButton';
 import { ArtTile } from '../components/ui/ArtTile';
+import { ProtectedArtworkDisplay } from '../components/ui/ProtectedArtworkDisplay';
 import { Icon } from '../assets/icons';
 import { useChat } from '../context/ChatContext';
+import { useAuth } from '../context/AuthContext';
+import { navigateToFullProfile } from '../lib/profileNavigation';
 import { useMockToast } from '../components/ui/MockToast';
 import { ChatSidebar } from '../components/chat/ChatSidebar';
 import type { ChatMessage, MessageStatus } from '../data/mockData';
+import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import {
+  createChatAttachmentSignedUrl,
+  getAttachmentTypeLabel,
+  formatAttachmentSize,
+  getChatAttachmentKind,
+  MAX_CHAT_FILE_BYTES,
+  MAX_CHAT_IMAGE_BYTES,
+  validateChatAttachment,
+} from '../lib/supabaseChatAttachments';
+import {
+  createArtworkProtectedSignedUrl,
+  listMyArtworks,
+  type ArtworkRecord,
+} from '../lib/supabaseArtworks';
+import { listMyProtectionSettings } from '../lib/supabaseProtection';
 import './ChatPage.css';
 
 const REACTION_EMOJIS = ['❤️', '👍', '😂', '😮', '😢'];
 const COMPOSER_EMOJIS = ['😀', '😂', '❤️', '👍', '🔥', '🎨', '😢', '🙏', '✅', '👏', '🎉', '😮'];
 
-const MOCK_IMAGE_NAMES = ['Update_v3.png', 'Revised_sketch.png', 'Final_pass.png', 'Color_test.png'];
-const MOCK_FILES: { name: string; type: string; size: string }[] = [
-  { name: 'reference_notes.pdf', type: 'PDF', size: '1.4 MB' },
-  { name: 'palette_guide.pdf', type: 'PDF', size: '820 KB' },
-  { name: 'commission_brief.docx', type: 'DOCX', size: '96 KB' },
-];
+interface ShareableArtwork extends ArtworkRecord {
+  previewUrl: string;
+  settings: {
+    dynamic_cloaking: boolean;
+    canvas_tiling: boolean;
+    right_click_shield: boolean;
+  };
+}
 
-function randomFrom<T>(list: T[]): T {
-  return list[Math.floor(Math.random() * list.length)];
+interface SharedArtworkPreview {
+  artworkId: string;
+  title: string;
+  ownerId: string;
+  previewUrl: string;
+  settings: {
+    dynamic_cloaking: boolean;
+    canvas_tiling: boolean;
+    right_click_shield: boolean;
+  };
 }
 
 function presenceLabel(presence: string, lastSeenLabel?: string): string {
@@ -62,12 +91,16 @@ export function ChatPage() {
     typingConversationId,
     sendTyping,
     sendTextMessage,
-    sendImageMessage,
-    sendFileMessage,
+    sendAttachmentMessage,
+    sendArtworkMessage,
     toggleReaction,
     markAsRead,
     hideConversation,
+    setConversationMuted,
+    getChatBlockState,
+    setChatUserBlocked,
   } = useChat();
+  const { user } = useAuth();
   const { toast, showToast } = useMockToast();
 
   const contextConversation = conversationId ? getConversation(conversationId) : undefined;
@@ -81,18 +114,87 @@ export function ChatPage() {
   const [showAttachSheet, setShowAttachSheet] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [activeReactionId, setActiveReactionId] = useState<string | null>(null);
-  const [lightbox, setLightbox] = useState<{ variant: 1 | 2 | 3 | 4 | 5 | 6; name?: string } | null>(null);
+  const [lightbox, setLightbox] = useState<{ variant: 1 | 2 | 3 | 4 | 5 | 6; name?: string; src?: string } | null>(null);
+  const [pendingAttachment, setPendingAttachment] = useState<{ file: File; kind: 'image' | 'file'; previewUrl?: string } | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>({});
+  const [attachmentErrors, setAttachmentErrors] = useState<Record<string, string>>({});
+  const [sharedArtworkPreviews, setSharedArtworkPreviews] = useState<Record<string, SharedArtworkPreview | null>>({});
+  const [shareArtworkOpen, setShareArtworkOpen] = useState(false);
+  const [shareableArtworks, setShareableArtworks] = useState<ShareableArtwork[]>([]);
+  const [selectedArtworkId, setSelectedArtworkId] = useState<string>();
+  const [shareArtworkLoading, setShareArtworkLoading] = useState(false);
+  const [shareArtworkError, setShareArtworkError] = useState<string>();
+  const [sharingArtwork, setSharingArtwork] = useState(false);
   const [sendingMessage, setSendingMessage] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingConversation, setDeletingConversation] = useState(false);
+  const [blockDialogOpen, setBlockDialogOpen] = useState(false);
+  const [blockState, setBlockState] = useState<{ blockedByMe: boolean; messagingUnavailable: boolean } | null>(null);
+  const [blockStateLoading, setBlockStateLoading] = useState(false);
+  const [blockStateError, setBlockStateError] = useState(false);
+  const [blockStateAttempt, setBlockStateAttempt] = useState(0);
+  const [blockActionPending, setBlockActionPending] = useState(false);
+  const [blockActionError, setBlockActionError] = useState<string>();
+  const [muteActionPending, setMuteActionPending] = useState(false);
+  const [menuActionError, setMenuActionError] = useState<string>();
+  const [openingProfile, setOpeningProfile] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pressFired = useRef(false);
   const typingStopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sendInFlightRef = useRef(false);
   const readTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chatViewActiveRef = useRef(false);
+
+  useEffect(() => {
+    const otherUserId = conversation?.otherUserId;
+    if (!otherUserId || otherUserId === user?.id) {
+      setBlockState(null);
+      setBlockStateLoading(false);
+      setBlockStateError(false);
+      return;
+    }
+    let active = true;
+    setBlockState(null);
+    setBlockStateLoading(true);
+    setBlockStateError(false);
+    void getChatBlockState(otherUserId)
+      .then((state) => {
+        if (active) setBlockState(state);
+      })
+      .catch((error) => {
+        console.error('ArtGuard: unable to load chat block state', error);
+        if (active) setBlockStateError(true);
+      })
+      .finally(() => {
+        if (active) setBlockStateLoading(false);
+      });
+    const refreshWhenActive = () => {
+      if (document.visibilityState === 'visible') setBlockStateAttempt((attempt) => attempt + 1);
+    };
+    window.addEventListener('focus', refreshWhenActive);
+    document.addEventListener('visibilitychange', refreshWhenActive);
+    return () => {
+      active = false;
+      window.removeEventListener('focus', refreshWhenActive);
+      document.removeEventListener('visibilitychange', refreshWhenActive);
+    };
+  }, [blockStateAttempt, conversation?.otherUserId, getChatBlockState, user?.id]);
+
+  const messagingUnavailable = Boolean(conversation?.otherUserId)
+    && (blockStateLoading || !blockState || blockState.messagingUnavailable);
+  const messagingUnavailableText = blockState?.blockedByMe
+    ? 'You blocked this user. Unblock them from the conversation menu to message again.'
+    : blockState?.messagingUnavailable
+      ? 'Messaging is currently unavailable.'
+      : blockStateError
+        ? 'Messaging availability could not be verified. Try refreshing this conversation.'
+        : 'Checking messaging availability…';
 
   useEffect(() => {
     let cancelled = false;
@@ -169,6 +271,105 @@ export function ChatPage() {
     };
   }, [conversationId, sendTyping]);
 
+  useEffect(() => {
+    const previewUrl = pendingAttachment?.previewUrl;
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [pendingAttachment?.previewUrl]);
+
+  useEffect(() => {
+    if (!conversation || !isSupabaseConfigured || !supabase) return;
+    let cancelled = false;
+    const attachments = conversation.messages.filter(
+      (message): message is ChatMessage & { attachmentStoragePath: string } =>
+        Boolean(message.attachmentStoragePath && !attachmentUrls[message.id]),
+    );
+    for (const message of attachments) {
+      void createChatAttachmentSignedUrl(
+        message.attachmentStoragePath,
+        message.kind === 'file' ? message.fileName : undefined,
+      )
+        .then((url) => {
+          if (!cancelled) setAttachmentUrls((current) => ({ ...current, [message.id]: url }));
+        })
+        .catch((error) => {
+          console.error('ArtGuard: unable to open authorized chat attachment', error);
+          if (!cancelled) {
+            setAttachmentErrors((current) => ({
+              ...current,
+              [message.id]: error instanceof Error ? error.message : 'The secure attachment could not be opened.',
+            }));
+          }
+        });
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [attachmentUrls, conversation]);
+
+  useEffect(() => {
+    if (!conversation || !isSupabaseConfigured || !supabase) return;
+    let cancelled = false;
+    const sharedMessages = conversation.messages.filter(
+      (message) => message.kind === 'artwork' && !(message.id in sharedArtworkPreviews),
+    );
+    for (const message of sharedMessages) {
+      if (!message.artworkId) {
+        setSharedArtworkPreviews((current) => ({ ...current, [message.id]: null }));
+        continue;
+      }
+      void (async () => {
+        try {
+          const { data, error } = await supabase.rpc('get_chat_shared_artwork_preview', {
+            p_conversation_id: conversation.id,
+            p_message_id: message.id,
+          });
+          if (error) throw error;
+          const record = (Array.isArray(data) ? data[0] : data) as {
+            artwork_id: string;
+            title: string;
+            owner_id: string;
+            protected_storage_path: string;
+            dynamic_cloaking: boolean;
+            canvas_tiling: boolean;
+            right_click_shield: boolean;
+          } | null;
+          if (!record) {
+            if (!cancelled) setSharedArtworkPreviews((current) => ({ ...current, [message.id]: null }));
+            return;
+          }
+          const { data: signed, error: signingError } = await supabase.storage
+            .from('artworks')
+            .createSignedUrl(record.protected_storage_path, 60);
+          if (signingError) throw signingError;
+          if (!cancelled) {
+            setSharedArtworkPreviews((current) => ({
+              ...current,
+              [message.id]: {
+                artworkId: record.artwork_id,
+                title: record.title,
+                ownerId: record.owner_id,
+                previewUrl: signed.signedUrl,
+                settings: {
+                  dynamic_cloaking: record.dynamic_cloaking,
+                  canvas_tiling: record.canvas_tiling,
+                  right_click_shield: record.right_click_shield,
+                },
+              },
+            }));
+          }
+        } catch (error) {
+          console.error('ArtGuard: unable to load shared protected artwork', error);
+          if (!cancelled) setSharedArtworkPreviews((current) => ({ ...current, [message.id]: null }));
+        }
+      })();
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [conversation, sharedArtworkPreviews]);
+
   if (!conversationId) {
     return <Navigate to="/chat" replace />;
   }
@@ -207,7 +408,7 @@ export function ChatPage() {
   const handleSend = async (e: FormEvent) => {
     e.preventDefault();
     const text = draft.trim();
-    if (!text || sendInFlightRef.current) return;
+    if (!text || messagingUnavailable || sendInFlightRef.current) return;
     sendInFlightRef.current = true;
     setSendingMessage(true);
     if (typingStopTimer.current) clearTimeout(typingStopTimer.current);
@@ -231,34 +432,138 @@ export function ChatPage() {
     setShowEmojiPicker(false);
   };
 
-  const handlePickPhoto = async () => {
-    if (sendInFlightRef.current) return;
+  const handlePickPhoto = () => {
+    if (messagingUnavailable || sendingMessage) return;
+    closeSheets();
+    if (imageInputRef.current) {
+      imageInputRef.current.value = '';
+      imageInputRef.current.click();
+    }
+  };
+
+  const handlePickFile = () => {
+    if (messagingUnavailable || sendingMessage) return;
+    closeSheets();
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileSelection = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    const validationError = validateChatAttachment(file);
+    if (validationError) {
+      showToast(validationError);
+      return;
+    }
+    const kind = getChatAttachmentKind(file);
+    if (!kind) {
+      showToast('This file type is not supported.');
+      return;
+    }
+    setPendingAttachment({
+      file,
+      kind,
+      previewUrl: kind === 'image' ? URL.createObjectURL(file) : undefined,
+    });
+    setUploadProgress(null);
+  };
+
+  const handleSendAttachment = async () => {
+    if (!pendingAttachment || messagingUnavailable || sendInFlightRef.current) return;
     sendInFlightRef.current = true;
     setSendingMessage(true);
+    setUploadProgress(0);
     try {
-      const sent = await sendImageMessage(conversation.id, randomFrom(MOCK_IMAGE_NAMES));
-      if (!sent) showToast('Message failed to send. Please try again.');
-      else showToast('Image attached (mock)');
-      closeSheets();
+      const sent = await sendAttachmentMessage(conversation.id, pendingAttachment.file, setUploadProgress);
+      if (!sent) {
+        showToast('The attachment was not sent. Please try again.');
+        return;
+      }
+      setPendingAttachment(null);
+      setUploadProgress(null);
+      showToast('Attachment sent.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'The attachment was not sent. Please try again.';
+      showToast(message);
     } finally {
       sendInFlightRef.current = false;
       setSendingMessage(false);
     }
   };
 
-  const handlePickFile = async () => {
-    if (sendInFlightRef.current) return;
-    const file = randomFrom(MOCK_FILES);
-    sendInFlightRef.current = true;
-    setSendingMessage(true);
+  const handleCamera = () => {
+    if (messagingUnavailable || sendingMessage) return;
+    closeSheets();
+    if (cameraInputRef.current) {
+      cameraInputRef.current.value = '';
+      cameraInputRef.current.click();
+    }
+  };
+
+  const handleOpenShareArtwork = async () => {
+    closeSheets();
+    setShareArtworkOpen(true);
+    setShareArtworkError(undefined);
+    setSelectedArtworkId(undefined);
+    setShareableArtworks([]);
+    if (!isSupabaseConfigured || !supabase || !user || user.role !== 'artist') {
+      setShareableArtworks([]);
+      setShareArtworkLoading(false);
+      return;
+    }
+
+    setShareArtworkLoading(true);
     try {
-      const sent = await sendFileMessage(conversation.id, file.name, file.type, file.size);
-      if (!sent) showToast('Message failed to send. Please try again.');
-      else showToast('File attached (mock)');
-      closeSheets();
+      const records = await listMyArtworks(user.id);
+      const eligible = records.filter((artwork) =>
+        artwork.status === 'ready'
+        && Boolean(artwork.protected_storage_path)
+        && (artwork.visibility === 'portfolio' || artwork.visibility === 'discover'),
+      );
+      const settings = await listMyProtectionSettings(user.id, eligible.map((artwork) => artwork.id));
+      const settingsByArtworkId = new Map(settings.map((item) => [item.artwork_id, item]));
+      const shareable = await Promise.all(eligible.map(async (artwork) => {
+        const protectionSettings = settingsByArtworkId.get(artwork.id);
+        return {
+          ...artwork,
+          previewUrl: await createArtworkProtectedSignedUrl(artwork.id, user.id),
+          settings: {
+            dynamic_cloaking: protectionSettings?.dynamic_cloaking ?? false,
+            canvas_tiling: protectionSettings?.canvas_tiling ?? false,
+            right_click_shield: protectionSettings?.right_click_shield ?? false,
+          },
+        };
+      }));
+      setShareableArtworks(shareable);
+    } catch (error) {
+      console.error('ArtGuard: unable to load shareable protected artworks', error);
+      setShareArtworkError(error instanceof Error ? error.message : 'Could not load your protected artworks.');
     } finally {
-      sendInFlightRef.current = false;
-      setSendingMessage(false);
+      setShareArtworkLoading(false);
+    }
+  };
+
+  const handleShareArtwork = async () => {
+    if (!selectedArtworkId || sharingArtwork || messagingUnavailable) return;
+    setSharingArtwork(true);
+    try {
+      const sent = await sendArtworkMessage(conversation.id, selectedArtworkId);
+      if (!sent) {
+        showToast('This artwork could not be shared from the current account mode.');
+        return;
+      }
+      setShareArtworkOpen(false);
+      setSelectedArtworkId(undefined);
+      showToast('Protected artwork shared.');
+    } catch (error) {
+      console.error('ArtGuard: artwork message failed', error);
+      showToast(error instanceof Error ? error.message : 'The artwork was not shared. Please try again.');
+    } finally {
+      setSharingArtwork(false);
     }
   };
 
@@ -276,13 +581,70 @@ export function ChatPage() {
     }
   };
 
-  const handleCamera = () => {
-    closeSheets();
-    showToast("Camera isn't available in this web prototype.");
-  };
-
   const insertEmoji = (emoji: string) => {
     setDraft((prev) => prev + emoji);
+  };
+
+  const handleViewProfile = async () => {
+    const otherUserId = conversation.otherUserId;
+    if (openingProfile) return;
+    if (!otherUserId || !user || otherUserId === user.id) {
+      showToast('This participant profile is unavailable.');
+      return;
+    }
+    setOpeningProfile(true);
+    setMenuActionError(undefined);
+    try {
+      const navigated = await navigateToFullProfile(navigate, otherUserId, user.id);
+      if (!navigated) {
+        setMenuActionError('This participant profile is no longer available.');
+        return;
+      }
+      setShowMenu(false);
+    } catch (error) {
+      console.error('ArtGuard: unable to open participant profile', error);
+      setMenuActionError('Could not open this participant profile. Please try again.');
+    } finally {
+      setOpeningProfile(false);
+    }
+  };
+
+  const handleToggleMute = async () => {
+    if (!conversation.otherUserId || muteActionPending) return;
+    setMuteActionPending(true);
+    setMenuActionError(undefined);
+    try {
+      const muted = !conversation.notificationsMuted;
+      await setConversationMuted(conversation.id, muted);
+      setShowMenu(false);
+      showToast(muted ? 'Notifications muted for this conversation.' : 'Notifications unmuted for this conversation.');
+    } catch (error) {
+      console.error('ArtGuard: unable to save conversation mute preference', error);
+      setMenuActionError('Could not save this notification setting. Please try again.');
+    } finally {
+      setMuteActionPending(false);
+    }
+  };
+
+  const handleChangeBlock = async (blocked: boolean) => {
+    const otherUserId = conversation.otherUserId;
+    if (!otherUserId || blockActionPending) return;
+    setBlockActionPending(true);
+    setBlockActionError(undefined);
+    try {
+      const nextState = await setChatUserBlocked(otherUserId, blocked);
+      setBlockState(nextState);
+      setBlockDialogOpen(false);
+      setShowMenu(false);
+      showToast(blocked ? 'User blocked. Messaging is unavailable until you unblock them.' : 'User unblocked.');
+    } catch (error) {
+      console.error('ArtGuard: unable to update chat block', error);
+      setBlockActionError(blocked
+        ? 'Could not block this user. Please try again.'
+        : 'Could not unblock this user. Please try again.');
+    } finally {
+      setBlockActionPending(false);
+    }
   };
 
   const renderReactionPicker = (message: ChatMessage) =>
@@ -358,36 +720,57 @@ export function ChatPage() {
 
           {showMenu && (
             <div className="card chat-menu-dropdown">
+              {!conversation.otherUserId && (
+                <div className="t-xs c-low" role="note" style={{ padding: '6px 12px' }}>
+                  Profile, mute, and block controls require a real account conversation.
+                </div>
+              )}
               <button
                 type="button"
                 className="tap-card chat-menu-item"
-                onClick={() => {
-                  setShowMenu(false);
-                  showToast('Profile preview coming soon');
-                }}
+                onClick={() => void handleViewProfile()}
+                disabled={!conversation.otherUserId || !user || conversation.otherUserId === user.id || openingProfile}
               >
-                View profile
+                {openingProfile ? 'Opening Profile…' : 'View Profile'}
               </button>
               <button
                 type="button"
                 className="tap-card chat-menu-item"
-                onClick={() => {
-                  setShowMenu(false);
-                  showToast(`Notifications muted for ${conversation.name}`);
-                }}
+                onClick={() => void handleToggleMute()}
+                disabled={!conversation.otherUserId || muteActionPending}
               >
-                Mute notifications
+                {muteActionPending ? 'Saving…' : conversation.notificationsMuted ? 'Unmute Notifications' : 'Mute Notifications'}
               </button>
               <button
                 type="button"
                 className="tap-card chat-menu-item c-danger"
                 onClick={() => {
-                  setShowMenu(false);
-                  showToast(`${conversation.name} blocked`);
+                  setBlockActionError(undefined);
+                  if (blockState?.blockedByMe) void handleChangeBlock(false);
+                  else {
+                    setShowMenu(false);
+                    setBlockDialogOpen(true);
+                  }
                 }}
+                disabled={!conversation.otherUserId || blockStateLoading || !blockState || blockActionPending}
               >
-                Block user
+                {blockActionPending ? 'Saving…' : blockState?.blockedByMe ? 'Unblock User' : 'Block User'}
               </button>
+              {(menuActionError || blockStateError) && (
+                <div className="t-xs c-danger" role="alert" style={{ padding: '4px 12px 8px' }}>
+                  {menuActionError ?? 'Could not verify messaging settings. Please retry.'}
+                </div>
+              )}
+              {blockStateError && (
+                <button
+                  type="button"
+                  className="tap-card chat-menu-item"
+                  onClick={() => setBlockStateAttempt((attempt) => attempt + 1)}
+                  disabled={blockStateLoading}
+                >
+                  Retry block status
+                </button>
+              )}
               <button
                 type="button"
                 className="tap-card chat-menu-item c-danger"
@@ -404,7 +787,12 @@ export function ChatPage() {
       }
       footer={
         <div className="chat-composer-wrap">
-          {showAttachSheet && (
+          {messagingUnavailable && (
+            <div className="chat-messaging-unavailable t-sm" role="status">
+              {messagingUnavailableText}
+            </div>
+          )}
+          {showAttachSheet && !messagingUnavailable && (
             <div className="chat-composer-sheet">
               <button type="button" className="chat-attach-row" onClick={() => void handlePickPhoto()} disabled={sendingMessage}>
                 <span className="chat-attach-icon">
@@ -424,6 +812,12 @@ export function ChatPage() {
                 </span>
                 Camera
               </button>
+              <button type="button" className="chat-attach-row" onClick={() => void handleOpenShareArtwork()}>
+                <span className="chat-attach-icon">
+                  <Icon name="image" style={{ width: 17, height: 17, stroke: 'var(--ag-text-mid)' }} />
+                </span>
+                Share Artwork
+              </button>
               <button type="button" className="chat-attach-row c-danger" onClick={() => setShowAttachSheet(false)}>
                 <span className="chat-attach-icon">
                   <Icon name="x" style={{ width: 15, height: 15, stroke: 'var(--ag-danger)' }} />
@@ -433,7 +827,164 @@ export function ChatPage() {
             </div>
           )}
 
-          {showEmojiPicker && (
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            onChange={handleFileSelection}
+            hidden
+          />
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            capture="environment"
+            onChange={handleFileSelection}
+            hidden
+          />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.txt,.rtf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip"
+            onChange={handleFileSelection}
+            hidden
+          />
+
+          {pendingAttachment && (
+            <section className="chat-attachment-confirm card" aria-label="Attachment preview">
+              {pendingAttachment.kind === 'image' && pendingAttachment.previewUrl ? (
+                <img className="chat-attachment-preview-image" src={pendingAttachment.previewUrl} alt="Selected image preview" />
+              ) : (
+                <span className="chat-file-icon">
+                  <Icon name="file" style={{ stroke: 'var(--ag-text-mid)' }} />
+                </span>
+              )}
+              <div className="chat-file-meta">
+                <span className="t-sm fw-700 chat-file-name">{pendingAttachment.file.name}</span>
+                <span className="t-xs c-low">
+                  {getAttachmentTypeLabel(pendingAttachment.file)} · {formatAttachmentSize(pendingAttachment.file.size)}
+                </span>
+                <span className="t-xs c-low">
+                  Limits: {MAX_CHAT_IMAGE_BYTES / (1024 * 1024)} MB per image; {MAX_CHAT_FILE_BYTES / (1024 * 1024)} MB per file.
+                </span>
+              </div>
+              <div className="chat-attachment-confirm-actions">
+                {uploadProgress !== null && (
+                  <div
+                    className="chat-upload-progress"
+                    role="progressbar"
+                    aria-label="Attachment upload progress"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={uploadProgress}
+                  >
+                    <span style={{ width: `${uploadProgress}%` }} />
+                    <span className="t-xs c-low">{sendingMessage ? `Uploading ${uploadProgress}%` : 'Ready to upload'}</span>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  disabled={sendingMessage}
+                  onClick={() => {
+                    setPendingAttachment(null);
+                    setUploadProgress(null);
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  disabled={sendingMessage || messagingUnavailable}
+                  onClick={() => void handleSendAttachment()}
+                >
+                  {sendingMessage ? 'Sending…' : 'Send'}
+                </button>
+              </div>
+            </section>
+          )}
+
+          {shareArtworkOpen && (
+            <div className="chat-artwork-modal-backdrop" role="presentation" onClick={() => !sharingArtwork && setShareArtworkOpen(false)}>
+              <section
+                className="chat-artwork-modal card"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="chat-share-artwork-title"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="row-between gap-10">
+                  <div>
+                    <h2 id="chat-share-artwork-title" className="t-md fw-700">Share Artwork</h2>
+                    <p className="t-xs c-low">Only ready artwork with a published protected preview can be shared.</p>
+                  </div>
+                  <IconButton
+                    icon="x"
+                    ariaLabel="Close artwork selection"
+                    disabled={sharingArtwork}
+                    onClick={() => setShareArtworkOpen(false)}
+                  />
+                </div>
+                {shareArtworkLoading ? (
+                  <p className="t-sm c-mid" role="status">Loading eligible protected artwork…</p>
+                ) : shareArtworkError ? (
+                  <div className="t-sm c-danger" role="alert">
+                    {shareArtworkError}
+                    <button type="button" className="link-sm" onClick={() => void handleOpenShareArtwork()}>Try again</button>
+                  </div>
+                ) : user?.role !== 'artist' ? (
+                  <p className="t-sm c-mid">Only artwork owned by an Artist account can be shared.</p>
+                ) : shareableArtworks.length === 0 ? (
+                  <p className="t-sm c-mid">No eligible published protected artwork is available to share.</p>
+                ) : (
+                  <div className="chat-artwork-options">
+                    {shareableArtworks.map((artwork) => (
+                      <button
+                        key={artwork.id}
+                        type="button"
+                        className={`chat-artwork-option${selectedArtworkId === artwork.id ? ' is-selected' : ''}`}
+                        aria-pressed={selectedArtworkId === artwork.id}
+                        onClick={() => setSelectedArtworkId(artwork.id)}
+                      >
+                        <span className="chat-artwork-option-preview">
+                          <ProtectedArtworkDisplay
+                            src={artwork.previewUrl}
+                            alt=""
+                            settings={artwork.settings}
+                            fitMode="cover"
+                            className="chat-artwork-option-image"
+                          />
+                        </span>
+                        <span className="chat-artwork-option-copy">
+                          <span className="t-sm fw-700">{artwork.title}</span>
+                          <span className="t-xs c-low">Protected · {artwork.visibility === 'discover' ? 'Discover' : 'Portfolio'}</span>
+                        </span>
+                        <span className="chat-artwork-option-check" aria-hidden="true">
+                          {selectedArtworkId === artwork.id ? '✓' : ''}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="chat-artwork-modal-actions">
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShareArtworkOpen(false)} disabled={sharingArtwork}>
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={() => void handleShareArtwork()}
+                    disabled={!selectedArtworkId || sharingArtwork || messagingUnavailable}
+                  >
+                    {sharingArtwork ? 'Sharing…' : 'Share'}
+                  </button>
+                </div>
+              </section>
+            </div>
+          )}
+
+          {showEmojiPicker && !messagingUnavailable && (
             <div className="chat-composer-sheet">
               <div className="row-between" style={{ padding: '2px 4px 6px' }}>
                 <span className="t-xs c-low fw-700">Emoji</span>
@@ -453,6 +1004,7 @@ export function ChatPage() {
             <IconButton
               icon="paperclip"
               ariaLabel="Attach a photo or file"
+              disabled={messagingUnavailable || sendingMessage}
               onClick={() => {
                 setShowAttachSheet((v) => !v);
                 setShowEmojiPicker(false);
@@ -461,6 +1013,7 @@ export function ChatPage() {
             <IconButton
               icon="smile"
               ariaLabel="Add an emoji"
+              disabled={messagingUnavailable || sendingMessage}
               onClick={() => {
                 setShowEmojiPicker((v) => !v);
                 setShowAttachSheet(false);
@@ -471,11 +1024,12 @@ export function ChatPage() {
                 type="text"
                 placeholder={`Message ${conversation.name.split(' ')[0]}…`}
                 value={draft}
+                disabled={messagingUnavailable}
                 onChange={(e) => {
                   const value = e.target.value;
                   setDraft(value);
                   if (typingStopTimer.current) clearTimeout(typingStopTimer.current);
-                  if (conversation) {
+                  if (conversation && !messagingUnavailable) {
                     if (value.trim()) void sendTyping(conversation.id, true);
                     else void sendTyping(conversation.id, false);
                     typingStopTimer.current = setTimeout(() => {
@@ -486,11 +1040,11 @@ export function ChatPage() {
                 aria-label={`Message ${conversation.name}`}
               />
             </div>
-            <IconButton icon="mic" ariaLabel="Record a voice message" onClick={() => showToast('Voice messages coming soon')} />
+            <IconButton icon="mic" ariaLabel="Record a voice message" disabled={messagingUnavailable} onClick={() => showToast('Voice messages coming soon')} />
             <button
               type="submit"
               aria-label="Send message"
-              disabled={!draft.trim() || sendingMessage}
+              disabled={!draft.trim() || sendingMessage || messagingUnavailable}
               aria-busy={sendingMessage}
               style={{
                 width: 38,
@@ -503,7 +1057,7 @@ export function ChatPage() {
                 flexShrink: 0,
                 border: 'none',
                 padding: 0,
-                opacity: draft.trim() && !sendingMessage ? 1 : 0.5,
+                opacity: draft.trim() && !sendingMessage && !messagingUnavailable ? 1 : 0.5,
               }}
             >
               <Icon name={sendingMessage ? 'clock' : 'send'} style={{ width: 16, height: 16, stroke: '#fff' }} />
@@ -548,7 +1102,56 @@ export function ChatPage() {
           );
         }
 
+        if (msg.kind === 'artwork') {
+          const artwork = sharedArtworkPreviews[msg.id];
+          return (
+            <div key={msg.id} className={`chat-msg-wrap${isMe ? ' is-me' : ''}`}>
+              <div className="chat-shared-artwork-card card">
+                {artwork ? (
+                  <>
+                    <div className="chat-shared-artwork-preview">
+                      <ProtectedArtworkDisplay
+                        src={artwork.previewUrl}
+                        alt={`Protected preview of ${artwork.title}`}
+                        settings={artwork.settings}
+                        fitMode="contain"
+                      />
+                    </div>
+                    <div className="chat-shared-artwork-copy">
+                      <span className="t-sm fw-700">{artwork.title}</span>
+                      <span className="t-xs c-low">Protected artwork</span>
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={() => navigate(`/market/artist/${artwork.ownerId}`)}
+                      >
+                        View Artwork
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="chat-shared-artwork-unavailable t-sm c-mid" role="status">
+                    {artwork === null ? 'This artwork is no longer available to view.' : 'Loading protected artwork…'}
+                  </div>
+                )}
+              </div>
+              {renderReactionBadge(msg)}
+              {renderReactionPicker(msg)}
+              <div className="chat-status-row" style={{ justifyContent: isMe ? 'flex-end' : 'flex-start', marginTop: 4 }}>
+                <span className="t-xs c-low">{msg.time}</span>
+                {isMe && (
+                  <>
+                    <StatusTicks status={msg.status} />
+                    {msg.id === lastOwnMessageId && msg.status === 'read' && <span className="t-xs c-accent chat-seen-label">Seen</span>}
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        }
+
         if (msg.kind === 'image') {
+          const imageUrl = attachmentUrls[msg.id] ?? msg.imageUrl;
           return (
             <div key={msg.id} className={`chat-msg-wrap${isMe ? ' is-me' : ''}`}>
               <div
@@ -558,34 +1161,34 @@ export function ChatPage() {
                 onTouchStart={() => startPress(() => toggleReactionPicker(msg.id))}
                 onTouchEnd={clearPress}
                 onContextMenu={contextMenuReact(msg)}
-                onClick={() => releaseTap(() => setLightbox({ variant: msg.imageVariant ?? 1, name: msg.imageName }))}
+                onClick={() => releaseTap(() => setLightbox({ variant: msg.imageVariant ?? 1, name: msg.imageName, src: imageUrl }))}
                 role="button"
                 tabIndex={0}
               >
-                <ArtTile
-                  variant={msg.imageVariant ?? 1}
-                  style={{
-                    height: 150,
-                    width: '100%',
-                    borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                    position: 'relative',
-                  }}
-                >
-                  <div
+                {imageUrl ? (
+                  <div className="chat-image-attachment">
+                    <img src={imageUrl} alt={msg.imageName ?? 'Shared image'} />
+                    <span className="t-xs">{msg.imageName}</span>
+                  </div>
+                ) : msg.attachmentStoragePath ? (
+                  <div className="chat-image-attachment-unavailable t-xs c-low" role="status">
+                    {attachmentErrors[msg.id] ? 'Image unavailable.' : 'Loading image…'}
+                  </div>
+                ) : (
+                  <ArtTile
+                    variant={msg.imageVariant ?? 1}
                     style={{
-                      position: 'absolute',
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      padding: '8px 10px',
-                      background: 'linear-gradient(0deg, rgba(0,0,0,0.55), transparent)',
+                      height: 150,
+                      width: '100%',
+                      borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                      position: 'relative',
                     }}
                   >
-                    <span className="t-xs" style={{ color: '#fff', fontWeight: 600 }}>
-                      {msg.imageName}
-                    </span>
-                  </div>
-                </ArtTile>
+                    <div className="chat-image-name-overlay">
+                      <span className="t-xs">{msg.imageName}</span>
+                    </div>
+                  </ArtTile>
+                )}
               </div>
               {renderReactionBadge(msg)}
               {renderReactionPicker(msg)}
@@ -615,8 +1218,6 @@ export function ChatPage() {
                 onTouchEnd={clearPress}
                 onContextMenu={contextMenuReact(msg)}
                 onClick={() => releaseTap(() => toggleReactionPicker(msg.id))}
-                role="button"
-                tabIndex={0}
               >
                 <span className="chat-file-icon">
                   <Icon name="file" style={{ stroke: isMe ? '#fff' : 'var(--ag-text-mid)' }} />
@@ -628,6 +1229,24 @@ export function ChatPage() {
                   <span className="t-xs" style={{ color: isMe ? 'rgba(255,255,255,0.8)' : 'var(--ag-text-low)' }}>
                     {msg.fileType} · {msg.fileSize}
                   </span>
+                  {(attachmentUrls[msg.id] ?? msg.attachmentUrl) ? (
+                    <a
+                      className="chat-file-download"
+                      href={attachmentUrls[msg.id] ?? msg.attachmentUrl}
+                      download={msg.fileName}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(event) => event.stopPropagation()}
+                      onMouseDown={(event) => event.stopPropagation()}
+                      onTouchStart={(event) => event.stopPropagation()}
+                    >
+                      Open or download
+                    </a>
+                  ) : msg.attachmentStoragePath ? (
+                    <span className="t-xs c-low" role="status">
+                      {attachmentErrors[msg.id] ? 'Secure download unavailable.' : 'Preparing secure download…'}
+                    </span>
+                  ) : null}
                 </div>
               </div>
               {renderReactionBadge(msg)}
@@ -711,7 +1330,11 @@ export function ChatPage() {
             style={{ position: 'absolute', top: 'max(env(safe-area-inset-top, 0px), 18px)', right: 18 }}
             onClick={() => setLightbox(null)}
           />
-          <ArtTile variant={lightbox.variant} locked={false} style={{ width: 'min(88vw, 420px)', height: 'min(60vh, 420px)' }} />
+          {lightbox.src ? (
+            <img className="chat-lightbox-image" src={lightbox.src} alt={lightbox.name ?? 'Shared image'} />
+          ) : (
+            <ArtTile variant={lightbox.variant} locked={false} style={{ width: 'min(88vw, 420px)', height: 'min(60vh, 420px)' }} />
+          )}
           {lightbox.name && (
             <div className="chat-lightbox-caption">
               <span className="t-sm fw-600">{lightbox.name}</span>
@@ -730,6 +1353,23 @@ export function ChatPage() {
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setDeleteDialogOpen(false)} disabled={deletingConversation}>Cancel</button>
               <button type="button" className="btn btn-secondary btn-sm account-danger-button" onClick={() => void handleHideConversation()} disabled={deletingConversation}>
                 {deletingConversation ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {blockDialogOpen && (
+        <div className="account-dialog-backdrop" role="presentation" onClick={() => !blockActionPending && setBlockDialogOpen(false)}>
+          <section className="account-dialog" role="dialog" aria-modal="true" aria-labelledby="block-user-title" onClick={(e) => e.stopPropagation()}>
+            <div className="account-dialog-icon"><Icon name="alert" /></div>
+            <h2 id="block-user-title">Block {conversation.name}?</h2>
+            <p>Neither of you will be able to send messages or start a new conversation while either block is active. Existing message history will remain.</p>
+            {blockActionError && <div className="t-xs c-danger" role="alert">{blockActionError}</div>}
+            <div className="account-dialog-actions">
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setBlockDialogOpen(false)} disabled={blockActionPending}>Cancel</button>
+              <button type="button" className="btn btn-secondary btn-sm account-danger-button" onClick={() => void handleChangeBlock(true)} disabled={blockActionPending}>
+                {blockActionPending ? 'Blocking…' : 'Block User'}
               </button>
             </div>
           </section>

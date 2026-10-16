@@ -11,6 +11,7 @@ export function previewFor(conversation: Conversation): string {
   const mine = last.from === 'me' ? 'You: ' : '';
   if (last.kind === 'image') return `${mine}Sent an image`;
   if (last.kind === 'file') return `${mine}Sent a file · ${last.fileName ?? ''}`;
+  if (last.kind === 'artwork') return `${mine}Shared an artwork`;
   if (last.kind === 'revision') return `${mine}Revision requested`;
   return `${mine}${last.text ?? ''}`;
 }

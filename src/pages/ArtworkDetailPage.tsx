@@ -10,6 +10,7 @@ import { Icon } from '../assets/icons';
 import { useArtworkFeed } from '../context/ArtworkFeedContext';
 import { useAuth } from '../context/AuthContext';
 import { useMockToast } from '../components/ui/MockToast';
+import { navigateToFullProfile } from '../lib/profileNavigation';
 import './ArtworkDetailPage.css';
 
 export function ArtworkDetailPage() {
@@ -34,6 +35,7 @@ export function ArtworkDetailPage() {
   const { toast, showToast } = useMockToast();
   const [draft, setDraft] = useState('');
   const [commentSubmitError, setCommentSubmitError] = useState<string>();
+  const [openingCommentProfileId, setOpeningCommentProfileId] = useState<string>();
   const commentInputRef = useRef<HTMLInputElement>(null);
 
   const post = artworkId ? getPost(artworkId) : undefined;
@@ -86,6 +88,20 @@ export function ArtworkDetailPage() {
   const focusComments = () => {
     commentInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     commentInputRef.current?.focus();
+  };
+
+  const openCommentAuthorProfile = async (authorId?: string) => {
+    if (!post.isSupabase || !authorId || openingCommentProfileId) return;
+    setOpeningCommentProfileId(authorId);
+    try {
+      const navigated = await navigateToFullProfile(navigate, authorId, user?.id);
+      if (!navigated) showToast('This commenter profile is no longer available.');
+    } catch (error) {
+      console.error('ArtGuard: unable to open commenter profile', error);
+      showToast('Could not open this commenter profile. Please try again.');
+    } finally {
+      setOpeningCommentProfileId(undefined);
+    }
   };
 
   return (
@@ -255,22 +271,56 @@ export function ArtworkDetailPage() {
 
         {post.comments.map((comment) => (
           <div className="comment-item" key={comment.id}>
-            <div
-              className="avatar avatar-sm"
-              style={{
-                background: 'var(--ag-grad-accent)',
-                backgroundImage: comment.authorAvatarDataUrl ? `url("${comment.authorAvatarDataUrl}")` : undefined,
-                backgroundPosition: 'center',
-                backgroundSize: 'cover',
-              }}
-            >
-              {!comment.authorAvatarDataUrl && comment.authorInitials}
-            </div>
+            {post.isSupabase && comment.authorId ? (
+              <button
+                type="button"
+                className="comment-author-avatar-link"
+                aria-label={`Open ${comment.author}'s profile`}
+                onClick={() => void openCommentAuthorProfile(comment.authorId)}
+                disabled={openingCommentProfileId !== undefined}
+              >
+                <span
+                  className="avatar avatar-sm"
+                  style={{
+                    background: 'var(--ag-grad-accent)',
+                    backgroundImage: comment.authorAvatarDataUrl ? `url("${comment.authorAvatarDataUrl}")` : undefined,
+                    backgroundPosition: 'center',
+                    backgroundSize: 'cover',
+                  }}
+                >
+                  {!comment.authorAvatarDataUrl && comment.authorInitials}
+                </span>
+              </button>
+            ) : (
+              <div
+                className="avatar avatar-sm"
+                style={{
+                  background: 'var(--ag-grad-accent)',
+                  backgroundImage: comment.authorAvatarDataUrl ? `url("${comment.authorAvatarDataUrl}")` : undefined,
+                  backgroundPosition: 'center',
+                  backgroundSize: 'cover',
+                }}
+              >
+                {!comment.authorAvatarDataUrl && comment.authorInitials}
+              </div>
+            )}
             <div className="comment-bubble">
               <div className="card" style={{ padding: '10px 14px' }}>
-                <div className="t-xs fw-700" style={{ marginBottom: 3 }}>
-                  {comment.author}
-                </div>
+                {post.isSupabase && comment.authorId ? (
+                  <button
+                    type="button"
+                    className="comment-author-name-link t-xs fw-700"
+                    style={{ marginBottom: 3 }}
+                    onClick={() => void openCommentAuthorProfile(comment.authorId)}
+                    disabled={openingCommentProfileId !== undefined}
+                  >
+                    {comment.author}
+                  </button>
+                ) : (
+                  <div className="t-xs fw-700" style={{ marginBottom: 3 }}>
+                    {comment.author}
+                  </div>
+                )}
                 <span className="t-sm c-mid">{comment.text}</span>
               </div>
               <span className="t-xs c-low" style={{ display: 'block', margin: '4px 0 0 6px' }}>

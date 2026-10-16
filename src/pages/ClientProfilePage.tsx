@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { ScreenShell } from '../components/ui/ScreenShell';
 import { BottomNav } from '../components/ui/BottomNav';
 import { IconButton } from '../components/ui/IconButton';
@@ -13,10 +13,11 @@ import {
   type CommissionPostDraft,
 } from '../components/CommissionPostForm';
 import { useAuth } from '../context/AuthContext';
+import { useChat } from '../context/ChatContext';
 import { CLIENT_COMMISSION_REQUESTS } from '../data/mockData';
 import type { CommissionRequest } from '../data/mockData';
 import { useMockToast } from '../components/ui/MockToast';
-import { usernameFromEmail } from '../lib/supabaseData';
+import { getPublicProfile, usernameFromEmail } from '../lib/supabaseData';
 import { isSupabaseConfigured } from '../lib/supabase';
 import './MarketplacePage.css';
 import './ClientProfilePage.css';
@@ -34,6 +35,7 @@ import {
   type CommissionPostEngagementSummary,
   type OwnerCommissionPostApplication,
   updateCommissionPost,
+  listOpenCommissionPosts,
   type CommissionPost,
   type CommissionPostStatus,
 } from '../lib/supabaseCommissionPosts';
@@ -87,10 +89,17 @@ function formatCommissionAmount(commission: MyCommission): string | null {
 }
 
 export function ClientProfilePage() {
+  const { clientId } = useParams<{ clientId?: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { startConversation } = useChat();
   const { toast, showToast } = useMockToast();
-  const isRealClient = isSupabaseConfigured && user?.role === 'client';
+  const isRealClient = !clientId && isSupabaseConfigured && user?.role === 'client';
+  const [viewedClient, setViewedClient] = useState<Awaited<ReturnType<typeof getPublicProfile>>>(null);
+  const [viewedClientPosts, setViewedClientPosts] = useState<CommissionPost[]>([]);
+  const [viewedClientLoading, setViewedClientLoading] = useState(Boolean(clientId));
+  const [viewedClientError, setViewedClientError] = useState<string>();
+  const [publicMessagePending, setPublicMessagePending] = useState(false);
 
   const [requests, setRequests] = useState<CommissionRequest[]>(CLIENT_COMMISSION_REQUESTS);
   const [composing, setComposing] = useState(false);
@@ -132,6 +141,38 @@ export function ClientProfilePage() {
   const [publicPostDeleteError, setPublicPostDeleteError] = useState<string | null>(null);
   const profilePostDeleteInFlight = useRef(false);
 
+  useEffect(() => {
+    if (!clientId || !isSupabaseConfigured) {
+      setViewedClient(null);
+      setViewedClientPosts([]);
+      setViewedClientLoading(false);
+      setViewedClientError(undefined);
+      return;
+    }
+    let active = true;
+    setViewedClient(null);
+    setViewedClientPosts([]);
+    setViewedClientLoading(true);
+    setViewedClientError(undefined);
+    void Promise.all([getPublicProfile(clientId), listOpenCommissionPosts()])
+      .then(([profile, posts]) => {
+        if (!active) return;
+        if (!profile || profile.role !== 'client') {
+          setViewedClientError('Client profile not found.');
+          return;
+        }
+        setViewedClient(profile);
+        setViewedClientPosts(posts.filter((post) => post.owner_id === profile.id && post.owner_role === 'client'));
+      })
+      .catch((error: unknown) => {
+        if (active) setViewedClientError(error instanceof Error ? error.message : 'Could not load this client profile.');
+      })
+      .finally(() => {
+        if (active) setViewedClientLoading(false);
+      });
+    return () => { active = false; };
+  }, [clientId]);
+
   const initials = (user?.name || 'C').slice(0, 1).toUpperCase();
   const visiblePublicPosts = publicPosts.filter(
     (post): post is CommissionPost & { status: Exclude<CommissionPostStatus, 'CANCELLED' | 'SELECTED'> } =>
@@ -139,6 +180,18 @@ export function ClientProfilePage() {
       && post.status !== 'SELECTED'
       && !deletedPublicPostIdsRef.current.ids.has(post.id),
   );
+
+  const messageViewedClient = async () => {
+    if (!viewedClient || viewedClient.id === user?.id || publicMessagePending) return;
+    setPublicMessagePending(true);
+    try {
+      const conversationId = await startConversation(viewedClient.id);
+      if (conversationId) navigate(`/chat/${conversationId}`);
+      else showToast('Could not start the conversation. Please try again.');
+    } finally {
+      setPublicMessagePending(false);
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -418,6 +471,102 @@ export function ClientProfilePage() {
     setComposing(false);
     showToast('Commission request posted (mock)');
   };
+
+  if (clientId) {
+    if (viewedClientLoading) {
+      return (
+        <ScreenShell header={<div className="px-hd"><IconButton icon="chevron-l" onClick={() => navigate(-1)} ariaLabel="Back" /></div>}>
+          <div className="card t-sm c-mid" style={{ textAlign: 'center', padding: 24 }}>Loading client profile…</div>
+        </ScreenShell>
+      );
+    }
+    if (!viewedClient || viewedClientError) {
+      return (
+        <ScreenShell header={<div className="px-hd"><IconButton icon="chevron-l" onClick={() => navigate(-1)} ariaLabel="Back" /></div>}>
+          <div className="card t-sm c-mid" style={{ textAlign: 'center', padding: 24 }} role="status">
+            {viewedClientError || 'Client profile not found.'}
+          </div>
+        </ScreenShell>
+      );
+    }
+    const viewedClientInitials = viewedClient.name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? '')
+      .join('');
+    return (
+      <ScreenShell
+        header={
+          <div className="px-hd row-between">
+            <IconButton icon="chevron-l" onClick={() => navigate(-1)} ariaLabel="Back" />
+            <span className="h-title">Client Profile</span>
+            <span style={{ width: 38 }} />
+          </div>
+        }
+      >
+        <div style={{ textAlign: 'center', paddingTop: 12, marginBottom: 22 }}>
+          <div
+            className="avatar avatar-xl"
+            style={{
+              margin: '0 auto 12px',
+              background: 'var(--ag-grad-accent)',
+              backgroundImage: viewedClient.avatar_data_url ? `url("${viewedClient.avatar_data_url}")` : undefined,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+            }}
+          >
+            {!viewedClient.avatar_data_url && viewedClientInitials}
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 700 }}>{viewedClient.name}</div>
+          <div className="t-sm c-low" style={{ marginTop: 3 }}>@{viewedClient.username} · Client</div>
+        </div>
+
+        {viewedClient.bio && (
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div className="t-xs c-mid" style={{ lineHeight: 1.65 }}>{viewedClient.bio}</div>
+          </div>
+        )}
+
+        {!!viewedClient.interests?.length && (
+          <div style={{ marginBottom: 20 }}>
+            <div className="section-title" style={{ marginBottom: 9 }}>Interests</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+              {viewedClient.interests.map((interest) => <span className="chip" key={interest}>{interest}</span>)}
+            </div>
+          </div>
+        )}
+
+        {viewedClient.id !== user?.id && (
+          <button type="button" className="btn btn-primary" style={{ width: '100%', marginBottom: 18 }} onClick={() => void messageViewedClient()} disabled={publicMessagePending}>
+            Message @{viewedClient.username}
+          </button>
+        )}
+
+        <section aria-labelledby="client-public-requests-heading">
+          <div className="section-title" id="client-public-requests-heading" style={{ marginBottom: 10 }}>Open Public Requests</div>
+          {viewedClientPosts.length === 0 ? (
+            <div className="card t-sm c-mid">No open public requests.</div>
+          ) : (
+            <div style={{ display: 'grid', gap: 10 }}>
+              {viewedClientPosts.map((post) => (
+                <article className="card" key={post.id}>
+                  <h3 className="t-sm fw-700" style={{ margin: '0 0 6px' }}>{post.title}</h3>
+                  <p className="t-xs c-mid" style={{ margin: 0, lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{post.description}</p>
+                  {(post.budget_min !== null || post.budget_max !== null) && (
+                    <div className="t-xs c-low" style={{ marginTop: 8 }}>
+                      Budget: {post.budget_min ?? '—'} – {post.budget_max ?? '—'}{post.currency ? ` ${post.currency}` : ''}
+                    </div>
+                  )}
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+        {toast}
+      </ScreenShell>
+    );
+  }
 
   return (
     <ScreenShell

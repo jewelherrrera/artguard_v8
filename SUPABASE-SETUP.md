@@ -108,11 +108,43 @@ Create two accounts, then:
 Presence is also Realtime-based. While B is connected, A sees **Active now**. After B disconnects,
 the profile falls back to the saved `last_seen_at` heartbeat, such as **Active 2m ago**.
 
+### Chat profile, mute, and block controls
+
+The conversation menu's **View Profile** action opens the existing safe public
+profile page for the other conversation participant. To enable persisted
+per-conversation notification mutes and server-enforced user blocking, manually
+review and apply `supabase/chat-mute-and-block.sql` in the Supabase SQL Editor.
+Apply it only after confirming that the project's existing database already has
+the canonical `participant_low` / `participant_high` conversation columns and
+the hardened `send_message(uuid, uuid, text, text, text, integer, text, text,
+text)` function. Its migration prerequisites are `chat-auth-runtime-fix.sql`,
+`chat-stabilization.sql`, `chat-reset-history.sql`, and
+`chat-write-security-hardening.sql` in their documented dependency order.
+For an existing project, verify those prerequisites are already applied; do
+not rerun the base schema, old chat scripts, or unrelated migrations to install
+this change.
+
+The migration adds only per-user conversation notification preferences and
+directed user-block relationships. It replaces the existing conversation
+creation and message-send RPCs with compatible versions that reject a new
+conversation or message if either participant has blocked the other. It does
+not alter stored messages, unread-message counts, existing notification rows,
+commission data, or profile data. The chat mute preference suppresses browser
+chat notifications for that conversation; it does not change unread message
+counts or unrelated artwork, commission, and system notifications. The app
+does not create persistent notification rows for chat messages.
+
+The application never runs this migration automatically. Verify prerequisite
+functions and columns in the target project's SQL Editor before applying this
+single migration, then test with two development accounts. Without applying
+it, the new mute/block controls cannot load or save settings and the server
+will not enforce blocking.
+
 ## Important scope note
 
-This implementation stores image/file attachment **metadata** in the database, matching the current UI.
-Actual binary uploads to Supabase Storage are not part of this first backend pass. The existing picker
-still uses the project's current mock attachment behavior.
+Chat images and documents are uploaded to a private Supabase Storage bucket and referenced by the
+existing messages table. They are not stored as PostgreSQL binaries. In mock mode, selected files are
+local to the current browser session and are not persisted.
 
 ## Secure artwork storage (Batch A)
 
@@ -147,6 +179,38 @@ Character, Chibi, Concept Art, Portrait, Fanart, Environment, and Other, and
 limits portfolio and Discover queries plus protected-derivative storage access
 to eligible visibility. Original files remain private, and the existing
 verification and commission-deliverable policies remain separate.
+
+### Private chat attachments and protected artwork sharing
+
+After `chat-mute-and-block.sql` and `artwork-publication.sql` and all of their
+prerequisites have been applied, manually review and run
+`supabase/chat-attachments-and-artwork-sharing.sql`. The chat prerequisite
+includes the canonical participant columns, the hardened `send_message`
+function, and the `user_blocks` table/functions from the mute-and-block
+migration. Artwork sharing requires the published-artwork fields and
+`artwork_protection_settings` used by the existing publication system.
+
+This migration adds attachment references and an artwork ID to existing chat
+messages, creates a private `chat-attachments` bucket, and installs
+participant-scoped policies for uploading, reading sent files, and removing
+orphaned uploads. It replaces the existing authenticated `send_message` RPC;
+sender identity continues to come from `auth.uid()`, while conversation
+membership, block state, attachment type/size/path, and artwork ownership and
+publication are validated server-side. The app allows JPG, PNG, WebP, and GIF
+images up to 15 MB, plus PDF, text, Office, and ZIP documents up to 20 MB.
+HTML, SVG, scripts, and executable file types are not accepted. File links use
+short-lived authorized downloads; uploaded content is never rendered as HTML.
+
+The artwork selector only includes ready artwork with a protected derivative
+whose current visibility is **Protected Portfolio** or **Discover**. The
+message references the artwork record instead of uploading a second copy.
+Recipients receive a protected preview only while the artwork remains eligible;
+making it private or deleting it prevents further preview signing. The migration
+does not change artwork visibility or grant access to private/original files.
+
+The application never runs this migration automatically. Verify the listed
+prerequisites in the target project's SQL Editor and apply this migration once.
+Do not rerun the base schema or unrelated migrations to enable attachments.
 
 ### Persistent Discover likes and comments
 

@@ -82,7 +82,7 @@ export interface Order {
   requirementTiles: (1 | 2 | 3 | 4 | 5 | 6)[];
 }
 
-export type ChatMessageKind = 'text' | 'image' | 'file' | 'revision';
+export type ChatMessageKind = 'text' | 'image' | 'file' | 'artwork' | 'revision';
 export type MessageStatus = 'sent' | 'delivered' | 'read';
 export type PresenceStatus = 'online' | 'offline' | 'recent';
 
@@ -94,9 +94,15 @@ export interface ChatMessage {
   text?: string;
   imageName?: string;
   imageVariant?: 1 | 2 | 3 | 4 | 5 | 6;
+  imageUrl?: string;
   fileName?: string;
   fileType?: string;
   fileSize?: string;
+  attachmentStoragePath?: string;
+  attachmentMimeType?: string;
+  attachmentSizeBytes?: number;
+  attachmentUrl?: string;
+  artworkId?: string;
   time: string;
   /** Delivery state for outgoing ('me') messages only. */
   status?: MessageStatus;
@@ -120,6 +126,7 @@ export interface Conversation {
   messages: ChatMessage[];
   /** Real-backend conversation metadata. Optional so existing mock data remains unchanged. */
   otherUserId?: string;
+  notificationsMuted?: boolean;
 }
 
 export const ARTISTS: Artist[] = [

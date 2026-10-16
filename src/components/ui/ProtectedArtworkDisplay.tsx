@@ -161,9 +161,31 @@ export function ProtectedArtworkDisplay({
       }}
     >
       {renderError ? <span role="img" aria-label={alt}>{renderError}</span> : !useCanvas ? (
-        <img src={src} alt={alt} draggable={rightClickShield ? false : undefined} style={{ width: '100%', height: '100%', objectFit: fitMode }} />
+        <img
+          src={src}
+          alt={alt}
+          draggable={rightClickShield ? false : undefined}
+          style={{
+            width: '100%',
+            height: '100%',
+            display: 'block',
+            objectFit: fitMode,
+          }}
+        />
       ) : (
-        <canvas ref={canvasRef} role="img" aria-label={alt} draggable={rightClickShield ? false : undefined} onDragStart={handleDragStart} style={{ width: '100%', height: '100%', objectFit: fitMode === 'contain' ? 'fill' : fitMode }} />
+        <canvas
+          ref={canvasRef}
+          role="img"
+          aria-label={alt}
+          draggable={rightClickShield ? false : undefined}
+          onDragStart={handleDragStart}
+          style={{
+            width: '100%',
+            height: '100%',
+            display: 'block',
+            objectFit: fitMode === 'contain' ? 'fill' : fitMode,
+          }}
+        />
       )}
     </div>
   );

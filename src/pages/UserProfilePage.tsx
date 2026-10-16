@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ScreenShell } from '../components/ui/ScreenShell';
 import { IconButton } from '../components/ui/IconButton';
 import { useChat } from '../context/ChatContext';
+import { useAuth } from '../context/AuthContext';
 import { getPublicProfile, relativeTimeLabel, type PublicProfile } from '../lib/supabaseData';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { useMockToast } from '../components/ui/MockToast';
@@ -13,6 +14,7 @@ export function UserProfilePage() {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
   const { startConversation, getUserPresence } = useChat();
+  const { user } = useAuth();
   const { toast, showToast } = useMockToast();
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,6 +56,7 @@ export function UserProfilePage() {
   const initials = profile.name.slice(0, 2).toUpperCase();
 
   const handleMessage = async () => {
+    if (!user || profile.id === user.id) return;
     const conversationId = await startConversation(profile.id);
     if (conversationId) navigate(`/chat/${conversationId}`);
     else showToast('Could not start the conversation. Please try again.');
@@ -90,10 +93,12 @@ export function UserProfilePage() {
         </div>
       ) : null}
 
-      <button type="button" className="btn btn-primary" style={{ width: '100%', marginBottom: 10 }} onClick={() => void handleMessage()}>
-        <Icon name="chat" style={{ width: 16, height: 16, stroke: '#fff' }} />
-        Message @{profile.username}
-      </button>
+      {profile.id !== user?.id && (
+        <button type="button" className="btn btn-primary" style={{ width: '100%', marginBottom: 10 }} onClick={() => void handleMessage()}>
+          <Icon name="chat" style={{ width: 16, height: 16, stroke: '#fff' }} />
+          Message @{profile.username}
+        </button>
+      )}
       {toast}
     </ScreenShell>
   );

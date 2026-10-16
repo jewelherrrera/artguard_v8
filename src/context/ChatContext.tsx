@@ -6,7 +6,18 @@ import { getAttachmentAutoReply, getAutoReply } from '../utils/autoReply';
 import { useAuth } from './AuthContext';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import {
+  formatAttachmentSize,
+  createChatAttachmentStoragePath,
+  getAttachmentTypeLabel,
+  getChatAttachmentKind,
+  removeChatAttachment,
+  safeAttachmentFilename,
+  uploadChatAttachment,
+} from '../lib/supabaseChatAttachments';
+import {
   createOrFindConversation,
+  getMyChatBlockState,
+  getMyConversationMutedState,
   type DbMessage,
   getMyConversationResetAt,
   getPublicProfile,
@@ -18,7 +29,10 @@ import {
   relativeTimeLabel,
   resetMyConversation,
   searchProfiles,
+  setMyChatBlocked,
+  setMyConversationMuted,
   updateMessageReaction,
+  type ChatBlockState,
   type SearchUser,
 } from '../lib/supabaseData';
 
@@ -38,8 +52,12 @@ interface ChatContextValue {
   sendTyping: (conversationId: string, isTyping: boolean) => Promise<void>;
   totalUnread: number;
   sendTextMessage: (conversationId: string, text: string) => Promise<ChatMessage | null>;
-  sendImageMessage: (conversationId: string, imageName: string) => Promise<ChatMessage | null>;
-  sendFileMessage: (conversationId: string, fileName: string, fileType: string, fileSize: string) => Promise<ChatMessage | null>;
+  sendAttachmentMessage: (
+    conversationId: string,
+    file: File,
+    onProgress?: (progress: number) => void,
+  ) => Promise<ChatMessage | null>;
+  sendArtworkMessage: (conversationId: string, artworkId: string) => Promise<ChatMessage | null>;
   toggleReaction: (conversationId: string, messageId: string, emoji: string) => void;
   markAsRead: (conversationId: string) => void;
   searchUsers: (term: string) => Promise<SearchUser[]>;
@@ -47,6 +65,9 @@ interface ChatContextValue {
   getUserPresence: (user: { id: string; last_seen_at?: string | null }) => { presence: PresenceStatus; label: string };
   refreshConversations: () => Promise<void>;
   hideConversation: (conversationId: string) => Promise<void>;
+  setConversationMuted: (conversationId: string, muted: boolean) => Promise<void>;
+  getChatBlockState: (otherUserId: string) => Promise<ChatBlockState>;
+  setChatUserBlocked: (otherUserId: string, blocked: boolean) => Promise<ChatBlockState>;
 }
 
 const ChatContext = createContext<ChatContextValue | undefined>(undefined);
@@ -102,6 +123,10 @@ function mapBroadcastMessage(row: DbMessage, currentUserId: string): ChatMessage
     fileName: row.file_name ?? undefined,
     fileType: row.file_type ?? undefined,
     fileSize: row.file_size ?? undefined,
+    attachmentStoragePath: row.attachment_storage_path ?? undefined,
+    attachmentMimeType: row.attachment_mime_type ?? undefined,
+    attachmentSizeBytes: row.attachment_size_bytes === null ? undefined : Number(row.attachment_size_bytes),
+    artworkId: row.artwork_id ?? undefined,
     time: new Date(row.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
     status: row.status,
     reaction: row.reaction ?? undefined,
@@ -255,8 +280,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const conversationsRef = useRef<Conversation[]>(conversations);
   const onlineUserIdsRef = useRef(onlineUserIds);
   const hiddenConversationIdsRef = useRef(hiddenConversationIds);
+  const mutedConversationIdsRef = useRef(new Set<string>());
   const resetAtByConversationRef = useRef(new Map<string, string | null>());
   const notifiedMessageIdsRef = useRef<Set<string>>(new Set());
+  const mockAttachmentUrlsRef = useRef<Set<string>>(new Set());
+  useEffect(() => () => {
+    mockAttachmentUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    mockAttachmentUrlsRef.current.clear();
+  }, []);
   useEffect(() => {
     conversationsRef.current = conversations;
   }, [conversations]);
@@ -276,6 +307,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     onlineUserIdsRef.current = new Set();
     setHiddenConversationIds(new Set());
     hiddenConversationIdsRef.current = new Set();
+    mutedConversationIdsRef.current = new Set();
     resetAtByConversationRef.current = new Map();
     setHiddenUnreadCount(0);
     setTypingConversationId(null);
@@ -287,6 +319,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     try {
       const loaded = await loadConversations(userId, onlineUserIdsRef.current);
       if (activeUserIdRef.current !== userId) return;
+      const mutedIds = new Set(loaded.filter((conversation) => conversation.notificationsMuted).map((conversation) => conversation.id));
+      mutedConversationIdsRef.current = mutedIds;
       for (const conversation of loaded) {
         rememberLatestResetAt(resetAtByConversationRef.current, conversation.id, conversation.resetAt);
       }
@@ -450,11 +484,30 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       ));
     });
 
-    const shouldNotify = typeof document === 'undefined'
+    let alertsAllowed = !mutedConversationIdsRef.current.has(row.conversation_id);
+    try {
+      const [muted, blockState] = await Promise.all([
+        getMyConversationMutedState(row.conversation_id, userId),
+        getMyChatBlockState(row.sender_id),
+      ]);
+      const nextMutedIds = new Set(mutedConversationIdsRef.current);
+      if (muted) nextMutedIds.add(row.conversation_id);
+      else nextMutedIds.delete(row.conversation_id);
+      mutedConversationIdsRef.current = nextMutedIds;
+      setConversations((current) => current.map((conversation) =>
+        conversation.id === row.conversation_id ? { ...conversation, notificationsMuted: muted } : conversation,
+      ));
+      alertsAllowed = !muted;
+      if (blockState.messagingUnavailable) alertsAllowed = false;
+    } catch (error) {
+      console.error('ArtGuard: unable to verify chat restrictions before notification', error);
+      alertsAllowed = false;
+    }
+    const shouldNotify = alertsAllowed && (typeof document === 'undefined'
       || document.visibilityState !== 'visible'
-      || !window.location.pathname.endsWith(row.conversation_id);
+      || !window.location.pathname.endsWith(row.conversation_id));
     if (shouldNotify && typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-      const body = row.text || (row.kind === 'image' ? 'Sent an image' : row.kind === 'file' ? 'Sent a file' : 'New message');
+      const body = row.text || (row.kind === 'image' ? 'Sent an image' : row.kind === 'file' ? 'Sent a file' : row.kind === 'artwork' ? 'Shared an artwork' : 'New message');
       new Notification(`${senderName} sent you a message`, { body, tag: `artguard-${row.conversation_id}` });
     }
 
@@ -524,6 +577,19 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, () => {
         void refreshConversations();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversation_notification_preferences', filter: `user_id=eq.${userId}` }, (payload) => {
+        if (activeUserIdRef.current !== userId) return;
+        const preference = payload.new as { conversation_id?: string; notifications_muted?: boolean };
+        if (!preference.conversation_id) return;
+        const muted = payload.eventType !== 'DELETE' && preference.notifications_muted === true;
+        const nextMutedIds = new Set(mutedConversationIdsRef.current);
+        if (muted) nextMutedIds.add(preference.conversation_id);
+        else nextMutedIds.delete(preference.conversation_id);
+        mutedConversationIdsRef.current = nextMutedIds;
+        setConversations((current) => current.map((conversation) =>
+          conversation.id === preference.conversation_id ? { ...conversation, notificationsMuted: muted } : conversation,
+        ));
       })
       .subscribe(() => {
       // Browser notifications require a user gesture in many browsers. Add a
@@ -601,6 +667,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           file_name: saved.fileName ?? null,
           file_type: saved.fileType ?? null,
           file_size: saved.fileSize ?? null,
+          attachment_storage_path: saved.attachmentStoragePath ?? null,
+          attachment_mime_type: saved.attachmentMimeType ?? null,
+          attachment_size_bytes: saved.attachmentSizeBytes ?? null,
+          artwork_id: saved.artworkId ?? null,
           created_at: saved.createdAt ?? new Date().toISOString(),
           status: saved.status ?? 'sent',
           reaction: saved.reaction ?? null,
@@ -679,44 +749,82 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     return message;
   }, [appendLocal, broadcastPersistedMessage, conversations, runAutoReply, user]);
 
-  const sendImageMessage = useCallback(async (conversationId: string, imageName: string): Promise<ChatMessage | null> => {
-    const imageVariant = IMAGE_VARIANTS[Math.floor(Math.random() * IMAGE_VARIANTS.length)];
+  const sendAttachmentMessage = useCallback(async (
+    conversationId: string,
+    file: File,
+    onProgress?: (progress: number) => void,
+  ): Promise<ChatMessage | null> => {
+    const kind = getChatAttachmentKind(file);
+    if (!kind) throw new Error('This file type is not supported.');
+    const fileName = safeAttachmentFilename(file.name);
+    const fileType = getAttachmentTypeLabel(file);
+    const fileSize = formatAttachmentSize(file.size);
+
     if (isSupabaseConfigured && supabase && user) {
+      const clientMessageId = crypto.randomUUID();
+      const storagePath = createChatAttachmentStoragePath(conversationId, user.id, clientMessageId, file);
       try {
-        const saved = await insertMessage(conversationId, user.id, crypto.randomUUID(), { kind: 'image', imageName, imageVariant });
+        await uploadChatAttachment(storagePath, file, onProgress);
+        const saved = await insertMessage(conversationId, user.id, clientMessageId, {
+          kind,
+          imageName: kind === 'image' ? fileName : undefined,
+          fileName,
+          fileType,
+          fileSize,
+          attachmentStoragePath: storagePath,
+          attachmentMimeType: file.type,
+          attachmentSizeBytes: file.size,
+        });
         appendLocal(conversationId, saved);
         await broadcastPersistedMessage(conversationId, saved, user.id, conversations);
         return saved;
       } catch (error) {
-        console.error('ArtGuard: image message failed', error);
-        return null;
+        try {
+          await removeChatAttachment(storagePath);
+        } catch (cleanupError) {
+          console.error('ArtGuard: failed to remove orphaned chat attachment', cleanupError);
+        }
+        throw error;
       }
     }
-    const id = nextId('img');
-    const message: ChatMessage = { id, from: 'me', kind: 'image', imageName, imageVariant, time: formatNow(), status: 'sent' };
+
+    const id = nextId(kind);
+    const attachmentUrl = URL.createObjectURL(file);
+    mockAttachmentUrlsRef.current.add(attachmentUrl);
+    const message: ChatMessage = {
+      id,
+      from: 'me',
+      kind,
+      imageName: kind === 'image' ? fileName : undefined,
+      imageVariant: IMAGE_VARIANTS[Math.floor(Math.random() * IMAGE_VARIANTS.length)],
+      imageUrl: kind === 'image' ? attachmentUrl : undefined,
+      fileName,
+      fileType,
+      fileSize,
+      attachmentMimeType: file.type,
+      attachmentSizeBytes: file.size,
+      attachmentUrl,
+      time: formatNow(),
+      status: 'sent',
+    };
     appendLocal(conversationId, message);
     runAutoReply(conversationId, id, getAttachmentAutoReply());
     return message;
   }, [appendLocal, broadcastPersistedMessage, conversations, runAutoReply, user]);
 
-  const sendFileMessage = useCallback(async (conversationId: string, fileName: string, fileType: string, fileSize: string): Promise<ChatMessage | null> => {
-    if (isSupabaseConfigured && supabase && user) {
-      try {
-        const saved = await insertMessage(conversationId, user.id, crypto.randomUUID(), { kind: 'file', fileName, fileType, fileSize });
-        appendLocal(conversationId, saved);
-        await broadcastPersistedMessage(conversationId, saved, user.id, conversations);
-        return saved;
-      } catch (error) {
-        console.error('ArtGuard: file message failed', error);
-        return null;
-      }
-    }
-    const id = nextId('file');
-    const message: ChatMessage = { id, from: 'me', kind: 'file', fileName, fileType, fileSize, time: formatNow(), status: 'sent' };
-    appendLocal(conversationId, message);
-    runAutoReply(conversationId, id, getAttachmentAutoReply());
-    return message;
-  }, [appendLocal, broadcastPersistedMessage, conversations, runAutoReply, user]);
+  const sendArtworkMessage = useCallback(async (
+    conversationId: string,
+    artworkId: string,
+  ): Promise<ChatMessage | null> => {
+    if (!isSupabaseConfigured || !supabase || !user) return null;
+    const saved = await insertMessage(conversationId, user.id, crypto.randomUUID(), {
+      kind: 'artwork',
+      artworkId,
+    });
+    appendLocal(conversationId, saved);
+    await broadcastPersistedMessage(conversationId, saved, user.id, conversations);
+    return saved;
+  }, [appendLocal, broadcastPersistedMessage, conversations, user]);
 
   const toggleReaction = useCallback(async (conversationId: string, messageId: string, emoji: string) => {
     const conversation = conversations.find((c) => c.id === conversationId);
@@ -806,6 +914,29 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     void refreshConversations();
   }, [refreshConversations, userId]);
 
+  const setConversationMuted = useCallback(async (conversationId: string, muted: boolean) => {
+    if (!isSupabaseConfigured || !supabase || !userId) {
+      throw new Error('Conversation notification preferences require a signed-in account.');
+    }
+    await setMyConversationMuted(conversationId, muted);
+    if (activeUserIdRef.current !== userId) return;
+    const nextMutedIds = new Set(mutedConversationIdsRef.current);
+    if (muted) nextMutedIds.add(conversationId);
+    else nextMutedIds.delete(conversationId);
+    mutedConversationIdsRef.current = nextMutedIds;
+    setConversations((current) => current.map((conversation) =>
+      conversation.id === conversationId ? { ...conversation, notificationsMuted: muted } : conversation,
+    ));
+  }, [userId]);
+
+  const getChatBlockState = useCallback(async (otherUserId: string) => {
+    return getMyChatBlockState(otherUserId);
+  }, []);
+
+  const setChatUserBlocked = useCallback(async (otherUserId: string, blocked: boolean) => {
+    return setMyChatBlocked(otherUserId, blocked);
+  }, []);
+
   const searchUsers = useCallback(async (term: string) => {
     if (!isSupabaseConfigured || !user) return [];
     try {
@@ -828,6 +959,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       const resetAt = await getMyConversationResetAt(userId, id);
       if (activeUserIdRef.current !== userId) return null;
       rememberLatestResetAt(resetAtByConversationRef.current, id, resetAt);
+      const notificationsMuted = await getMyConversationMutedState(id, userId);
+      if (activeUserIdRef.current !== userId) return null;
+      const nextMutedIds = new Set(mutedConversationIdsRef.current);
+      if (notificationsMuted) nextMutedIds.add(id);
+      else nextMutedIds.delete(id);
+      mutedConversationIdsRef.current = nextMutedIds;
       const nextHiddenIds = new Set(hiddenConversationIdsRef.current);
       nextHiddenIds.delete(id);
       hiddenConversationIdsRef.current = nextHiddenIds;
@@ -857,7 +994,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           unreadCount: 0,
           messages: [],
           otherUserId: other.id,
-        } as Conversation & { otherUserId: string };
+          notificationsMuted,
+        };
 
         setConversations((prev) => {
           const existing = prev.find((c) => c.id === id);
@@ -925,9 +1063,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<ChatContextValue>(() => ({
     conversations, getConversation, loadConversationById, typingConversationId, totalUnread,
-    sendTyping, sendTextMessage, sendImageMessage, sendFileMessage, toggleReaction, markAsRead,
+    sendTyping, sendTextMessage, sendAttachmentMessage, sendArtworkMessage, toggleReaction, markAsRead,
     searchUsers, startConversation, getUserPresence, refreshConversations, hideConversation,
-  }), [conversations, getConversation, typingConversationId, totalUnread, sendTyping, sendTextMessage, sendImageMessage, sendFileMessage, toggleReaction, markAsRead, searchUsers, startConversation, getUserPresence, refreshConversations, hideConversation]);
+    setConversationMuted, getChatBlockState, setChatUserBlocked,
+  }), [conversations, getConversation, typingConversationId, totalUnread, sendTyping, sendTextMessage, sendAttachmentMessage, sendArtworkMessage, toggleReaction, markAsRead, searchUsers, startConversation, getUserPresence, refreshConversations, hideConversation, setConversationMuted, getChatBlockState, setChatUserBlocked]);
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 }

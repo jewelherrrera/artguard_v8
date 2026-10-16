@@ -35,12 +35,19 @@ export function ArtworkCard({ post, onOpen, onToggleLike, likePending = false, l
       onKeyDown={handleKeyDown}
       aria-label={`Open artwork by ${post.artistName}`}
     >
-      <ArtTile variant={post.image} style={{ width: '100%', aspectRatio: post.aspectRatio }}>
+      <ArtTile
+        variant={post.image}
+        style={{
+          width: '100%',
+          aspectRatio: post.isSupabase && post.previewUrl ? undefined : post.aspectRatio,
+        }}
+      >
         {post.previewUrl && (
           <ProtectedArtworkDisplay
             src={post.previewUrl}
             alt={`${post.title ?? 'Protected artwork'} by ${post.artistName}`}
             settings={post.protectionSettings}
+            fitMode={post.isSupabase ? 'contain' : 'cover'}
           />
         )}
         <div className="artwork-thumb-overlay">

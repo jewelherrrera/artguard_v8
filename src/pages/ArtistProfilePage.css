@@ -47,6 +47,42 @@
   margin-top: 18px;
 }
 
+.artist-profile-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 18px;
+}
+
+.artist-profile-message-button {
+  width: auto;
+  min-width: 150px;
+}
+
+.artist-profile-message-error {
+  overflow-wrap: anywhere;
+}
+
+.artist-protected-portfolio {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  align-items: start;
+  gap: 12px;
+}
+
+.artist-protected-portfolio-card {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  align-self: start;
+}
+
+.artist-protected-portfolio-image {
+  width: 100%;
+  overflow: hidden;
+}
+
 .artist-public-posts-heading {
   margin-bottom: 10px;
 }

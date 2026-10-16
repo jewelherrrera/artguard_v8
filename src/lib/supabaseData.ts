@@ -57,13 +57,17 @@ export interface DbMessage {
   id: string;
   conversation_id: string;
   sender_id: string;
-  kind: 'text' | 'image' | 'file' | 'revision';
+  kind: 'text' | 'image' | 'file' | 'artwork' | 'revision';
   text: string | null;
   image_name: string | null;
   image_variant: number | null;
   file_name: string | null;
   file_type: string | null;
   file_size: string | null;
+  attachment_storage_path: string | null;
+  attachment_mime_type: string | null;
+  attachment_size_bytes: number | string | null;
+  artwork_id: string | null;
   created_at: string;
   status: MessageStatus;
   reaction: string | null;
@@ -78,7 +82,13 @@ export interface DbConversation {
 export type LoadedConversation = Conversation & {
   otherUserId: string;
   resetAt: string | null;
+  notificationsMuted: boolean;
 };
+
+export interface ChatBlockState {
+  blockedByMe: boolean;
+  messagingUnavailable: boolean;
+}
 
 export function initialsFor(name: string): string {
   return name
@@ -114,6 +124,10 @@ function mapMessage(row: DbMessage, currentUserId: string): ChatMessage {
     fileName: row.file_name ?? undefined,
     fileType: row.file_type ?? undefined,
     fileSize: row.file_size ?? undefined,
+    attachmentStoragePath: row.attachment_storage_path ?? undefined,
+    attachmentMimeType: row.attachment_mime_type ?? undefined,
+    attachmentSizeBytes: row.attachment_size_bytes === null ? undefined : Number(row.attachment_size_bytes),
+    artworkId: row.artwork_id ?? undefined,
     time: new Date(row.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
     status: row.status,
     reaction: row.reaction ?? undefined,
@@ -268,6 +282,55 @@ export async function createOrFindConversation(_currentUserId: string, otherUser
   return String(data);
 }
 
+export async function setMyConversationMuted(conversationId: string, muted: boolean): Promise<void> {
+  if (!supabase) throw new Error('Supabase is not configured.');
+  const { data, error } = await supabase.rpc('set_my_conversation_muted', {
+    p_conversation_id: conversationId,
+    p_muted: muted,
+  });
+  if (error) throw error;
+  if (data !== muted) throw new Error('The notification preference was not saved.');
+}
+
+export async function getMyConversationMutedState(conversationId: string, currentUserId: string): Promise<boolean> {
+  if (!supabase) throw new Error('Supabase is not configured.');
+  const { data, error } = await supabase
+    .from('conversation_notification_preferences')
+    .select('notifications_muted')
+    .eq('conversation_id', conversationId)
+    .eq('user_id', currentUserId)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.notifications_muted === true;
+}
+
+export async function getMyChatBlockState(otherUserId: string): Promise<ChatBlockState> {
+  if (!supabase) throw new Error('Supabase is not configured.');
+  const { data, error } = await supabase.rpc('get_my_chat_block_state', {
+    p_other_user_id: otherUserId,
+  });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row || typeof row.blocked_by_me !== 'boolean' || typeof row.messaging_unavailable !== 'boolean') {
+    throw new Error('The messaging restrictions could not be verified.');
+  }
+  return { blockedByMe: row.blocked_by_me, messagingUnavailable: row.messaging_unavailable };
+}
+
+export async function setMyChatBlocked(otherUserId: string, blocked: boolean): Promise<ChatBlockState> {
+  if (!supabase) throw new Error('Supabase is not configured.');
+  const { data, error } = await supabase.rpc('set_my_chat_block', {
+    p_other_user_id: otherUserId,
+    p_blocked: blocked,
+  });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row || typeof row.blocked_by_me !== 'boolean' || typeof row.messaging_unavailable !== 'boolean') {
+    throw new Error('The block setting could not be confirmed.');
+  }
+  return { blockedByMe: row.blocked_by_me, messagingUnavailable: row.messaging_unavailable };
+}
+
 export async function getMyConversationResetAt(currentUserId: string, conversationId: string): Promise<string | null> {
   if (!supabase) return null;
   const { data, error } = await supabase
@@ -308,6 +371,18 @@ export async function loadConversations(
   if (!conversationIds.length) return [];
   const resetAtByConversation = new Map(
     (memberships ?? []).map((row) => [row.conversation_id, row.reset_at as string | null]),
+  );
+
+  const { data: preferenceRows, error: preferencesError } = await supabase
+    .from('conversation_notification_preferences')
+    .select('conversation_id,notifications_muted')
+    .eq('user_id', currentUserId)
+    .in('conversation_id', conversationIds);
+  if (preferencesError) throw preferencesError;
+  const mutedConversationIds = new Set(
+    (preferenceRows ?? [])
+      .filter((row) => row.notifications_muted)
+      .map((row) => row.conversation_id as string),
   );
 
   const { data: participantRows, error: participantsError } = await supabase
@@ -384,6 +459,7 @@ export async function loadConversations(
         unreadCount,
         messages: mapped,
         otherUserId: other.id,
+        notificationsMuted: mutedConversationIds.has(id),
         resetAt: resetAtByConversation.get(id) ?? null,
       } as LoadedConversation;
     })
@@ -461,13 +537,17 @@ export async function insertMessage(
   currentUserId: string,
   clientMessageId: string,
   message: {
-    kind: 'text' | 'image' | 'file' | 'revision';
+    kind: 'text' | 'image' | 'file' | 'artwork' | 'revision';
     text?: string;
     imageName?: string;
     imageVariant?: number;
     fileName?: string;
     fileType?: string;
     fileSize?: string;
+    attachmentStoragePath?: string;
+    attachmentMimeType?: string;
+    attachmentSizeBytes?: number;
+    artworkId?: string;
   },
 ): Promise<ChatMessage> {
   if (!supabase) throw new Error('Supabase is not configured.');
@@ -486,6 +566,10 @@ export async function insertMessage(
     p_file_name: message.fileName ?? null,
     p_file_type: message.fileType ?? null,
     p_file_size: message.fileSize ?? null,
+    p_attachment_storage_path: message.attachmentStoragePath ?? null,
+    p_attachment_mime_type: message.attachmentMimeType ?? null,
+    p_attachment_size_bytes: message.attachmentSizeBytes ?? null,
+    p_artwork_id: message.artworkId ?? null,
   });
   if (error) throw error;
 

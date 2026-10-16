@@ -18,6 +18,7 @@ import { CommissionWorkspacePage } from '../pages/CommissionWorkspacePage';
 import { ProtectionPage } from '../pages/ProtectionPage';
 import { ChatInboxPage } from '../pages/ChatInboxPage';
 import { ChatPage } from '../pages/ChatPage';
+import { ClientProfilePage } from '../pages/ClientProfilePage';
 import { AnalyticsPage } from '../pages/AnalyticsPage';
 import { PremiumPage } from '../pages/PremiumPage';
 import { SettingsPage } from '../pages/SettingsPage';
@@ -132,6 +133,14 @@ export function AppRoutes() {
         }
       />
       <Route
+        path="/profile/client/:clientId"
+        element={
+          <RequireAuth>
+            <ClientProfilePage />
+          </RequireAuth>
+        }
+      />
+      <Route
         path="/market/artwork/:artworkId"
         element={
           <RequireAuth>
@@ -169,7 +178,6 @@ export function AppRoutes() {
           </RequireAuth>
         }
       />
-
       {/* Profile tab */}
       <Route
         path="/profile"

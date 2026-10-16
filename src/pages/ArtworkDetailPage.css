@@ -54,6 +54,35 @@
   min-width: 0;
 }
 
+.comment-author-avatar-link,
+.comment-author-name-link {
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+.comment-author-avatar-link {
+  align-self: flex-start;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+}
+
+.comment-author-name-link {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+}
+
+.comment-author-avatar-link:disabled,
+.comment-author-name-link:disabled {
+  cursor: wait;
+}
+
 .comment-composer {
   display: flex;
   align-items: center;

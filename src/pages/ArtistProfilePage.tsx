@@ -9,6 +9,7 @@ import { ArtTile } from '../components/ui/ArtTile';
 import { Icon } from '../assets/icons';
 import { ARTISTS, CURRENT_ARTIST } from '../data/mockData';
 import { useAuth } from '../context/AuthContext';
+import { useChat } from '../context/ChatContext';
 import { useMockToast } from '../components/ui/MockToast';
 import { getPublicProfile, initialsFor, usernameFromEmail, type PublicProfile } from '../lib/supabaseData';
 import { isSupabaseConfigured } from '../lib/supabase';
@@ -82,12 +83,16 @@ export function ArtistProfilePage() {
   const { artistId } = useParams<{ artistId?: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { startConversation } = useChat();
   const { toast, showToast } = useMockToast();
+  const [startingConversation, setStartingConversation] = useState(false);
+  const [messageError, setMessageError] = useState<string>();
 
   const isSelf = !artistId;
   const isRealSelf = isSelf && isSupabaseConfigured && user?.role === 'artist';
   const publicArtist = artistId ? ARTISTS.find((a) => a.id === artistId) : undefined;
   const [realProfile, setRealProfile] = useState<PublicProfile | null>(null);
+  const isViewingOwnProfile = isSelf || Boolean(user && realProfile?.id === user.id);
   const [realProfileLoading, setRealProfileLoading] = useState(Boolean((artistId && !publicArtist) || isRealSelf));
   const [realProfileError, setRealProfileError] = useState<string | undefined>();
   const [realPortfolio, setRealPortfolio] = useState<PublicArtworkRecord[]>([]);
@@ -697,7 +702,6 @@ export function ArtistProfilePage() {
                 ariaLabel="More options"
                 triggerStyle={{ background: 'rgba(0,0,0,0.25)', borderColor: 'rgba(255,255,255,0.2)' }}
                 items={[
-                  { label: 'Message', onClick: () => navigate('/chat') },
                   { label: 'Report artist', onClick: () => showToast(`${profile.name} reported (mock)`) },
                   { label: 'Block artist', onClick: () => showToast(`${profile.name} blocked (mock)`), danger: true },
                 ]}
@@ -719,6 +723,26 @@ export function ArtistProfilePage() {
           </div>
     </div>
   );
+
+  const handleMessageArtist = async () => {
+    const recipientId = realProfile?.id;
+    if (startingConversation || !recipientId || !user || recipientId === user.id) return;
+
+    setStartingConversation(true);
+    setMessageError(undefined);
+    try {
+      const conversationId = await startConversation(recipientId);
+      if (!conversationId) {
+        setMessageError('Could not start the conversation. Please try again.');
+        return;
+      }
+      navigate(`/chat/${conversationId}`);
+    } catch (error) {
+      setMessageError(error instanceof Error ? error.message : 'Could not start the conversation. Please try again.');
+    } finally {
+      setStartingConversation(false);
+    }
+  };
 
   return (
     <ScreenShell
@@ -771,7 +795,7 @@ export function ArtistProfilePage() {
               {profile.handle} · {profile.tags.join(' · ')}
             </div>
           </div>
-          {isSelf && (
+          {isViewingOwnProfile && (
             <button type="button" className="btn btn-ghost btn-sm" onClick={() => navigate('/profile/edit')}>
               Edit
             </button>
@@ -809,6 +833,21 @@ export function ArtistProfilePage() {
         <p className="t-xs c-mid" style={{ lineHeight: 1.6, marginBottom: isSelf ? 12 : 18 }}>
           {profile.bio}
         </p>
+
+        {profile.source === 'supabase' && !isViewingOwnProfile && realProfile && (
+          <div className="artist-profile-actions">
+            <button
+              type="button"
+              className="btn btn-primary artist-profile-message-button"
+              onClick={() => void handleMessageArtist()}
+              disabled={startingConversation || !user || realProfile.id === user.id}
+            >
+              <Icon name="chat" style={{ width: 16, height: 16, stroke: '#fff' }} />
+              {startingConversation ? 'Opening conversation…' : 'Message'}
+            </button>
+            {messageError && <div className="t-xs c-danger artist-profile-message-error" role="alert">{messageError}</div>}
+          </div>
+        )}
 
         {isSelf && profile.tags.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 18 }}>
@@ -996,10 +1035,10 @@ export function ArtistProfilePage() {
           {portfolioLoading && <div className="card t-sm c-mid" role="status">Loading portfolio...</div>}
           {!portfolioLoading && portfolioError && <div className="card t-sm protection-artwork-error" role="alert">Could not load portfolio.</div>}
           {!portfolioLoading && !portfolioError && realPortfolio.length === 0 && <div className="card t-sm c-mid">No artworks in portfolio yet.</div>}
-          {!portfolioLoading && !portfolioError && realPortfolio.length > 0 && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
+          {!portfolioLoading && !portfolioError && realPortfolio.length > 0 && <div className="artist-protected-portfolio">
             {realPortfolio.map((artwork) => (
-              <article className="card" key={artwork.id} style={{ padding: 0, overflow: 'hidden' }}>
-                <div style={{ background: 'var(--ag-surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <article className="card artist-protected-portfolio-card" key={artwork.id} style={{ padding: 0, overflow: 'hidden' }}>
+                <div className="artist-protected-portfolio-image" style={{ background: 'var(--ag-surface-2)' }}>
                   {portfolioUrls[artwork.id] ? (
                     <ProtectedArtworkDisplay
                       src={portfolioUrls[artwork.id]}
