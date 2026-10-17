@@ -25,9 +25,6 @@
   min-width: 0;
   padding: 18px !important;
   border-radius: var(--ag-r-lg);
-  border-color: var(--ag-border-soft);
-  background: var(--ag-surface);
-  box-shadow: var(--ag-shadow-card);
 }
 
 .workspace-summary-card > .row-between:first-child {
@@ -92,11 +89,6 @@
 .workspace-escrow-card {
   margin-bottom: 16px;
   border-left: 3px solid var(--ag-primary);
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--ag-primary) 7%, var(--ag-surface)),
-    var(--ag-surface) 62%
-  );
 }
 
 .workspace-escrow-heading {

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useIonViewDidEnter } from '@ionic/react';
 import { useNavigate } from 'react-router-dom';
 import { ScreenShell } from '../components/ui/ScreenShell';
 import { BottomNav } from '../components/ui/BottomNav';
@@ -26,7 +27,7 @@ function relativeNotificationTime(value: string): string {
   return `${elapsedDays}d ago`;
 }
 
-const ACTIVE_COMMISSION_STATUSES = new Set(['REQUESTED', 'ACCEPTED', 'IN_PROGRESS', 'REVISION_REQUESTED']);
+const ACTIVE_COMMISSION_STATUSES = new Set(['ACCEPTED', 'IN_PROGRESS', 'REVISION_REQUESTED']);
 
 function commissionSnapshotLabel(commission: MyCommission): string {
   const details = [commission.service_name_snapshot];
@@ -40,9 +41,13 @@ function commissionSnapshotLabel(commission: MyCommission): string {
   return details.filter((detail): detail is string => Boolean(detail)).join(' · ');
 }
 
-function paidTotalsByCurrency(payments: CommissionPayment[]): Array<{ currency: string; amount: number; count: number }> {
+function paidTotalsByCurrency(payments: CommissionPayment[], now = new Date()): Array<{ currency: string; amount: number; count: number }> {
   const totals = new Map<string, { amount: number; count: number }>();
   for (const payment of payments) {
+    const paidAt = payment.paid_at ? new Date(payment.paid_at) : null;
+    if (!paidAt || Number.isNaN(paidAt.getTime())
+      || paidAt.getFullYear() !== now.getFullYear()
+      || paidAt.getMonth() !== now.getMonth()) continue;
     const amount = Number(payment.amount);
     if (!Number.isFinite(amount)) continue;
     const total = totals.get(payment.currency) ?? { amount: 0, count: 0 };
@@ -51,6 +56,22 @@ function paidTotalsByCurrency(payments: CommissionPayment[]): Array<{ currency: 
     totals.set(payment.currency, total);
   }
   return Array.from(totals, ([currency, total]) => ({ currency, ...total }));
+}
+
+function paidPaymentHistoryPoints(payments: CommissionPayment[], now = new Date()): string | null {
+  const monthlyCounts = Array.from({ length: 6 }, () => 0);
+  for (const payment of payments) {
+    if (!payment.paid_at) continue;
+    const paidAt = new Date(payment.paid_at);
+    if (Number.isNaN(paidAt.getTime())) continue;
+    const monthsAgo = (now.getFullYear() - paidAt.getFullYear()) * 12 + now.getMonth() - paidAt.getMonth();
+    if (monthsAgo >= 0 && monthsAgo < monthlyCounts.length) {
+      monthlyCounts[monthlyCounts.length - monthsAgo - 1] += 1;
+    }
+  }
+  if (!monthlyCounts.some((count) => count > 0)) return null;
+  const maxCount = Math.max(...monthlyCounts);
+  return monthlyCounts.map((count, index) => `${index * 52} ${28 - (count / maxCount) * 20}`).join(' ');
 }
 
 function compactCommissionStatusLabel(commission: MyCommission): string {
@@ -72,60 +93,122 @@ export function HomeDashboardPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useMockToast();
-  const { notifications, unreadCount, error: notificationsError, markAsRead } = useNotifications();
+  const { notifications, unreadCount, loading: loadingNotifications, error: notificationsError, refreshNotifications, markAsRead } = useNotifications();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notificationActionError, setNotificationActionError] = useState<string>();
   const notificationAnchorRef = useRef<HTMLDivElement>(null);
 
   const [myCommissions, setMyCommissions] = useState<MyCommission[]>([]);
-  const [commissionTab, setCommissionTab] = useState<'active' | 'completed'>('active');
+  const [commissionTab, setCommissionTab] = useState<'active' | 'pending' | 'completed'>('active');
   const [loadingCommissions, setLoadingCommissions] = useState(true);
   const [commissionLoadError, setCommissionLoadError] = useState<string | null>(null);
   const [commissionActionId, setCommissionActionId] = useState<string | null>(null);
   const [paidCommissionPayments, setPaidCommissionPayments] = useState<CommissionPayment[]>([]);
   const [loadingPaidCommissionPayments, setLoadingPaidCommissionPayments] = useState(true);
   const [paidCommissionPaymentsError, setPaidCommissionPaymentsError] = useState(false);
+  const [refreshingDashboard, setRefreshingDashboard] = useState(false);
   const [commissionProgressById, setCommissionProgressById] = useState<Record<string, number>>({});
+  const [commissionProgressFailedById, setCommissionProgressFailedById] = useState<Record<string, boolean>>({});
+  const dashboardRefreshInProgress = useRef(false);
+  const dashboardHasLoadedCommissions = useRef(false);
+  const lastCommissionNotificationSignature = useRef<{ userId: string; signature: string } | null>(null);
 
-  const activeCommissions = myCommissions.filter((commission) => ACTIVE_COMMISSION_STATUSES.has(commission.status));
-  const completedCommissions = myCommissions.filter((commission) => commission.status === 'COMPLETED');
+  const pendingCommissions = useMemo(() => myCommissions.filter((commission) => commission.status === 'REQUESTED'
+    && (user?.role === 'artist' ? !commission.isClient : commission.isClient)), [myCommissions, user?.role]);
+  const activeCommissions = useMemo(() => myCommissions.filter((commission) => ACTIVE_COMMISSION_STATUSES.has(commission.status)), [myCommissions]);
+  const completedCommissions = useMemo(() => myCommissions.filter((commission) => commission.status === 'COMPLETED'), [myCommissions]);
   const completedCommissionCount = completedCommissions.length;
-  const visibleCommissions = commissionTab === 'active' ? activeCommissions : completedCommissions;
-  const paidCurrencyTotals = paidTotalsByCurrency(paidCommissionPayments);
-  const pendingRequestCount = myCommissions.filter((commission) => commission.status === 'REQUESTED'
-    && (user?.role === 'artist' ? !commission.isClient : commission.isClient)).length;
-  const recentCommissionActivity = notifications
+  const visibleCommissions = commissionTab === 'active'
+    ? activeCommissions
+    : commissionTab === 'pending'
+      ? (user?.role === 'artist' ? [] : pendingCommissions)
+      : completedCommissions;
+  const paidCurrencyTotals = useMemo(() => paidTotalsByCurrency(paidCommissionPayments), [paidCommissionPayments]);
+  const paidHistoryPoints = useMemo(() => paidPaymentHistoryPoints(paidCommissionPayments), [paidCommissionPayments]);
+  const currentMonthPaidCount = paidCurrencyTotals.reduce((count, total) => count + total.count, 0);
+  const pendingRequestCount = pendingCommissions.length;
+  const recentCommissionActivity = useMemo(() => notifications
     .filter((notification) => notification.notification_type === 'commission' || notification.notification_type === 'revision')
-    .slice(0, 5);
+    .slice(0, 5), [notifications]);
+  const quickStats: Array<{ key: 'active' | 'pending' | 'completed'; label: string; value: number; tone: 'gold' | 'blue' | 'green' }> = [
+    { key: 'active', label: 'Active', value: activeCommissions.length, tone: 'gold' },
+    { key: 'pending', label: 'Pending', value: pendingRequestCount, tone: 'blue' },
+    { key: 'completed', label: 'Completed', value: completedCommissionCount, tone: 'green' },
+  ];
+  const commissionSectionRef = useRef<HTMLElement>(null);
+
+  const refreshCommissions = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const rows = await listMyCommissions(user.id);
+      setMyCommissions(rows);
+      setCommissionLoadError(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not refresh dashboard commissions.';
+      setCommissionLoadError(message);
+      throw error;
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     if (!isSupabaseConfigured || !user) {
       setMyCommissions([]);
       setCommissionLoadError(null);
       setLoadingCommissions(false);
+      dashboardHasLoadedCommissions.current = false;
       return;
     }
     let active = true;
     setLoadingCommissions(true);
     setMyCommissions([]);
     setCommissionLoadError(null);
-    listMyCommissions(user.id)
-      .then((rows) => {
-        if (active) setMyCommissions(rows);
-      })
-      .catch((error) => {
-        if (active) {
-          setMyCommissions([]);
-          setCommissionLoadError(error instanceof Error ? error.message : 'Could not load dashboard commissions.');
-        }
+    dashboardHasLoadedCommissions.current = false;
+    void refreshCommissions()
+      .catch((error: unknown) => {
+        console.error('ArtGuard: unable to load dashboard commissions', error);
       })
       .finally(() => {
-        if (active) setLoadingCommissions(false);
+        if (active) {
+          setLoadingCommissions(false);
+          dashboardHasLoadedCommissions.current = true;
+        }
       });
     return () => {
       active = false;
     };
-  }, [user]);
+  }, [refreshCommissions, user]);
+
+  useIonViewDidEnter(() => {
+    if (!isSupabaseConfigured || !user?.id || !dashboardHasLoadedCommissions.current) return;
+    void refreshCommissions().catch((error: unknown) => {
+      console.error('ArtGuard: unable to refresh commissions when returning to dashboard', error);
+    });
+    void refreshNotifications().catch((error: unknown) => {
+      console.error('ArtGuard: unable to refresh activity when returning to dashboard', error);
+    });
+  });
+
+  const commissionNotificationSignature = useMemo(() => notifications
+    .filter((notification) => notification.notification_type === 'commission')
+    .map((notification) => `${notification.id}:${notification.created_at}`)
+    .join('|'), [notifications]);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !user?.id) {
+      lastCommissionNotificationSignature.current = null;
+      return;
+    }
+    const previous = lastCommissionNotificationSignature.current;
+    if (!previous || previous.userId !== user.id) {
+      lastCommissionNotificationSignature.current = { userId: user.id, signature: commissionNotificationSignature };
+      return;
+    }
+    if (previous.signature === commissionNotificationSignature) return;
+    lastCommissionNotificationSignature.current = { userId: user.id, signature: commissionNotificationSignature };
+    void refreshCommissions().catch((error: unknown) => {
+      console.error('ArtGuard: unable to refresh commissions after commission activity changed', error);
+    });
+  }, [commissionNotificationSignature, refreshCommissions, user?.id]);
 
   useEffect(() => {
     if (!isSupabaseConfigured || !user) {
@@ -159,6 +242,7 @@ export function HomeDashboardPage() {
   useEffect(() => {
     if (!isSupabaseConfigured || !user || activeCommissions.length === 0) {
       setCommissionProgressById({});
+      setCommissionProgressFailedById({});
       return;
     }
 
@@ -167,13 +251,14 @@ export function HomeDashboardPage() {
       try {
         const updates = await listCommissionProgress(commission.id);
         const latest = updates.reduce((max, update) => Math.max(max, Number(update.progress_percent) || 0), 0);
-        return [commission.id, latest] as const;
+        return [commission.id, latest, false] as const;
       } catch {
-        return [commission.id, 0] as const;
+        return [commission.id, 0, true] as const;
       }
     })).then((entries) => {
       if (!active) return;
-      setCommissionProgressById(Object.fromEntries(entries));
+      setCommissionProgressById(Object.fromEntries(entries.filter(([, , failed]) => !failed).map(([id, value]) => [id, value])));
+      setCommissionProgressFailedById(Object.fromEntries(entries.filter(([, , failed]) => failed).map(([id]) => [id, true])));
     });
 
     return () => {
@@ -181,11 +266,38 @@ export function HomeDashboardPage() {
     };
   }, [user?.id, activeCommissions]);
 
-  const refreshCommissions = async () => {
-    if (!user) return;
-    const rows = await listMyCommissions(user.id);
-    setMyCommissions(rows);
-    setCommissionLoadError(null);
+  const refreshDashboard = async () => {
+    if (dashboardRefreshInProgress.current || loadingCommissions || loadingPaidCommissionPayments || loadingNotifications) return;
+    if (!user || !isSupabaseConfigured) {
+      await refreshNotifications();
+      return;
+    }
+    dashboardRefreshInProgress.current = true;
+    setRefreshingDashboard(true);
+    try {
+      const [commissionsResult, paymentsResult] = await Promise.allSettled([
+        listMyCommissions(user.id),
+        listMyPaidCommissionPayments(user.id, user.role),
+      ]);
+      if (commissionsResult.status === 'fulfilled') {
+        setMyCommissions(commissionsResult.value);
+        setCommissionLoadError(null);
+      } else {
+        setCommissionLoadError(commissionsResult.reason instanceof Error
+          ? commissionsResult.reason.message
+          : 'Could not refresh dashboard commissions.');
+      }
+      if (paymentsResult.status === 'fulfilled') {
+        setPaidCommissionPayments(paymentsResult.value);
+        setPaidCommissionPaymentsError(false);
+      } else {
+        setPaidCommissionPaymentsError(true);
+      }
+      await refreshNotifications();
+    } finally {
+      dashboardRefreshInProgress.current = false;
+      setRefreshingDashboard(false);
+    }
   };
 
   const handleAcceptCommission = async (commissionId: string) => {
@@ -256,6 +368,9 @@ export function HomeDashboardPage() {
   return (
     <ScreenShell
       contentClassName="home-dashboard-content"
+      loading={loadingCommissions || loadingPaidCommissionPayments || loadingNotifications || refreshingDashboard}
+      loadingLabel="Loading dashboard"
+      onRefresh={refreshDashboard}
       header={
         <div className="px-hd row-between home-dashboard-header">
           <div className="row gap-10">
@@ -277,7 +392,7 @@ export function HomeDashboardPage() {
               badge={unreadCount > 0 ? (unreadCount > 99 ? '99+' : String(unreadCount)) : undefined}
             />
             {notificationsOpen && (
-              <div className="notification-preview" role="dialog" aria-label="Notification preview">
+              <div className="notification-preview glass-surface" role="dialog" aria-label="Notification preview">
                 <div className="notification-preview-header">
                   <span className="t-sm fw-700">Notifications</span>
                   {unreadCount > 0 && <span className="t-xs c-low">{unreadCount} unread</span>}
@@ -320,356 +435,347 @@ export function HomeDashboardPage() {
       }
       footer={<BottomNav active="home" />}
     >
-      <div className="dash-grid">
-        <div className="dash-main">
+      <div className="home-dashboard-shell">
+        <div className="dashboard-summary-row">
           {isSupabaseConfigured ? (
             <button
               type="button"
-              className="tap-card card home-revenue-card"
-              style={{
-                width: '100%',
-                textAlign: 'left',
-                cursor: 'pointer',
-                background: 'var(--ag-grad-primary)',
-                border: 'none',
-                marginBottom: 16,
-              }}
+              className="tap-card card home-revenue-card glass-surface"
               onClick={() => navigate('/home/analytics')}
             >
-              <div className="row-between" style={{ marginBottom: 10 }}>
-                <span className="t-xs" style={{ color: 'rgba(22,33,59,0.7)' }}>
+              <div className="row-between home-revenue-header">
+                <span className="t-xs home-revenue-label">
                   {user?.role === 'artist' ? 'Revenue · This month' : 'Spending · This month'}
                 </span>
-                {paidCurrencyTotals.length > 0 && (
-                  <span className="badge" style={{ background: 'rgba(22,33,59,0.16)', color: 'var(--ag-ink)' }}>
-                    +18%
-                  </span>
-                )}
               </div>
+
               {loadingPaidCommissionPayments ? (
-                <div className="t-sm fw-600" style={{ color: 'var(--ag-ink)' }}>Loading...</div>
+                <div className="t-sm fw-600 home-revenue-loading">Loading...</div>
               ) : paidCommissionPaymentsError ? (
-                <div className="t-sm fw-600" role="alert" style={{ color: 'var(--ag-ink)' }}>
-                  Could not load payment summary.
-                </div>
+                <div className="t-sm fw-600 home-revenue-loading" role="alert">Could not load payment summary.</div>
               ) : paidCurrencyTotals.length === 0 ? (
                 <>
-                  <div className="mono" style={{ fontSize: 29, fontWeight: 700, color: 'var(--ag-ink)' }}>₱0.00</div>
-                  <div className="t-xs" style={{ color: 'rgba(22,33,59,0.7)', marginTop: 4 }}>No paid commissions yet</div>
+                  <div className="mono home-revenue-amount">—</div>
+                  <div className="t-xs home-revenue-subtext">No paid commissions this month</div>
                 </>
               ) : paidCurrencyTotals.length === 1 ? (
                 <>
-                  <div className="mono" style={{ fontSize: 29, fontWeight: 700, color: 'var(--ag-ink)' }}>
+                  <div className="mono home-revenue-amount">
                     {paidCurrencyTotals[0].currency} {paidCurrencyTotals[0].amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
-                  <div className="t-xs" style={{ color: 'rgba(22,33,59,0.7)', marginTop: 4 }}>
+                  <div className="t-xs home-revenue-subtext">
                     {paidCurrencyTotals[0].count} paid commission{paidCurrencyTotals[0].count === 1 ? '' : 's'}
                   </div>
                 </>
               ) : (
                 <>
-                  <div className="t-sm fw-700" style={{ color: 'var(--ag-ink)', marginBottom: 5 }}>Multiple currencies</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <div className="t-sm fw-700 home-revenue-multi-label">Multiple currencies</div>
+                  <div className="home-revenue-multi-list">
                     {paidCurrencyTotals.map((total) => (
-                      <div className="row-between t-xs" key={total.currency} style={{ color: 'var(--ag-ink)' }}>
+                      <div className="row-between t-xs home-revenue-multi-item" key={total.currency}>
                         <span>{total.currency}</span>
                         <span className="mono">{total.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
                     ))}
                   </div>
-                  <div className="t-xs" style={{ color: 'rgba(22,33,59,0.7)', marginTop: 4 }}>
-                    {paidCommissionPayments.length} paid commission{paidCommissionPayments.length === 1 ? '' : 's'}
+                  <div className="t-xs home-revenue-subtext">
+                    {currentMonthPaidCount} paid commission{currentMonthPaidCount === 1 ? '' : 's'} this month
                   </div>
                 </>
               )}
-              <div className="home-revenue-chart" aria-label="Revenue chart area">
-                {paidCurrencyTotals.length > 0 ? (
+
+              <div className="home-revenue-chart" role="img" aria-label="Paid commission activity over the past six months">
+                {paidHistoryPoints ? (
                   <svg viewBox="0 0 260 36" className="home-revenue-graph-svg" aria-hidden="true">
-                    <path d="M 0 22 C 34 18, 54 25, 78 17 S 138 12, 162 20 S 214 8, 260 10" />
+                    <polyline points={paidHistoryPoints} />
                   </svg>
                 ) : (
-                  <div className="home-revenue-chart-empty">No revenue history yet</div>
+                  <div className="home-revenue-chart-empty">
+                    {paidCommissionPayments.length > 0 ? 'Paid history unavailable' : 'No paid history yet'}
+                  </div>
                 )}
               </div>
             </button>
           ) : (
             <button
               type="button"
-              className="tap-card card home-revenue-card"
-              style={{
-                background: 'var(--ag-grad-primary)',
-                border: 'none',
-                marginBottom: 16,
-                position: 'relative',
-                overflow: 'hidden',
-              }}
+              className="tap-card card home-revenue-card glass-surface"
               onClick={() => navigate('/home/analytics')}
             >
-              <div
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  backgroundImage:
-                    'repeating-linear-gradient(135deg, rgba(22,33,59,0.06) 0 2px, transparent 2px 14px)',
-                }}
-              />
-              <div className="row-between" style={{ position: 'relative', marginBottom: 10 }}>
-                <span className="t-xs" style={{ color: 'rgba(22,33,59,0.72)' }}>
-                  Revenue · This month
-                </span>
+              <div className="row-between home-revenue-header">
+                <span className="t-xs home-revenue-label">Revenue · This month</span>
               </div>
-              <div className="mono" style={{ fontSize: 29, fontWeight: 700, color: 'var(--ag-ink)', position: 'relative' }}>
-                No revenue history yet
+              <div className="mono home-revenue-amount">
+                {user?.role === 'artist' ? 'No revenue history yet' : 'No spending history yet'}
               </div>
-              <div className="home-revenue-chart" aria-label="Revenue chart area" style={{ position: 'relative' }}>
-                <div className="home-revenue-chart-empty">No revenue history yet</div>
+              <div className="home-revenue-chart" aria-label="Revenue chart area">
+                <div className="home-revenue-chart-empty">No payment history available</div>
               </div>
             </button>
           )}
 
-          {isSupabaseConfigured && (
-            <>
-              <div className="row-between home-commissions-heading" style={{ marginBottom: 12 }}>
-                <div>
-                  <span className="section-title">Your Commissions</span>
-                  {!loadingCommissions && !commissionLoadError && (
-                    <div className="t-xs c-low" style={{ marginTop: 3 }}>
-                      {activeCommissions.length} active · {completedCommissionCount} completed · {pendingRequestCount} pending
-                    </div>
-                  )}
-                </div>
-                {user?.role === 'client' && (
+          <div className="home-summary-sidebar">
+            <aside className="home-quick-stats" aria-label="Quick stats">
+              <div className="home-quick-stats-header">Quick Stats</div>
+              <div className="home-quick-stats-grid">
+                {quickStats.map((stat) => (
                   <button
+                    key={stat.label}
                     type="button"
-                    className="link-sm tap-card"
-                    style={{ width: 'auto' }}
-                    onClick={() => navigate('/commission/start')}
-                  >
-                    + Start Commission
-                  </button>
-                )}
-              </div>
-
-              <div className="segmented" role="tablist" aria-label="Commission history" style={{ marginBottom: 12 }}>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={commissionTab === 'active'}
-                  className={`segmented-option${commissionTab === 'active' ? ' active' : ''}`}
-                  onClick={() => setCommissionTab('active')}
-                >
-                  Active
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={commissionTab === 'completed'}
-                  className={`segmented-option${commissionTab === 'completed' ? ' active' : ''}`}
-                  onClick={() => setCommissionTab('completed')}
-                >
-                  Completed
-                </button>
-              </div>
-
-              {loadingCommissions && (
-                <div className="card t-xs c-low" style={{ marginBottom: 20 }}>
-                  Loading dashboard...
-                </div>
-              )}
-
-              {!loadingCommissions && commissionLoadError && (
-                <div className="card t-sm c-mid" role="alert" style={{ textAlign: 'center', marginBottom: 20 }}>
-                  Could not load dashboard commissions.
-                </div>
-              )}
-
-              {!loadingCommissions && !commissionLoadError && commissionTab === 'active' && activeCommissions.length === 0 && (
-                <div className="card t-sm c-mid" style={{ textAlign: 'center', marginBottom: 20 }}>
-                  No active commissions yet.
-                </div>
-              )}
-
-              {!loadingCommissions && !commissionLoadError && commissionTab === 'completed' && completedCommissions.length === 0 && (
-                <div className="card t-sm c-mid" style={{ textAlign: 'center', marginBottom: 20 }}>
-                  No completed commissions yet.
-                </div>
-              )}
-
-              {visibleCommissions.map((commission, i) => {
-                const rawProgress = Number(commissionProgressById[commission.id] ?? 0);
-                const progressPercent = commission.status === 'COMPLETED'
-                  ? 100
-                  : Math.max(0, Math.min(100, Number.isFinite(rawProgress) ? rawProgress : 0));
-                const dueAt = getCommissionDueAt(commission);
-                const dueLabel = dueAt
-                  ? `Due ${new Date(dueAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
-                  : 'No deadline set';
-                const progressLabel = commission.status === 'REQUESTED'
-                  ? 'Awaiting approval'
-                  : commission.status === 'ACCEPTED'
-                    ? 'Accepted'
-                    : commission.status === 'REVISION_REQUESTED'
-                      ? 'Revision requested'
-                      : progressPercent > 0 ? `${progressPercent}% complete` : 'Not started';
-
-                return (
-                  <button
-                    key={commission.id}
-                    type="button"
-                    className="tap-card card home-commission-card"
-                    style={{ marginBottom: i === visibleCommissions.length - 1 ? 20 : 10 }}
-                    onClick={() => navigate(`/home/workspace/${commission.id}`)}
-                  >
-                    <div className="home-commission-card-header">
-                      <div
-                        className="avatar avatar-sm"
-                        style={
-                          commission.counterparty?.avatar_data_url
-                            ? { backgroundImage: `url(${commission.counterparty.avatar_data_url})`, backgroundSize: 'cover' }
-                            : {}
-                        }
-                      >
-                        {!commission.counterparty?.avatar_data_url && initialsFor(commission.counterparty?.name ?? '?')}
-                      </div>
-                      <div className="home-commission-card-body">
-                        <div className="row-between">
-                          <span className="t-sm fw-700 home-commission-title">{commission.title}</span>
-                          <span className={`badge ${commission.status === 'REQUESTED' ? 'badge-warning' : 'badge-accent'}`}>
-                            {compactCommissionStatusLabel(commission).replace(' ', '\u00A0')}
-                          </span>
-                        </div>
-                        <div className="home-commission-meta">
-                          {commission.counterparty?.name ?? 'Unknown'} · {new Date(commission.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                        </div>
-                        <div className="home-commission-progress-row">
-                          <span className="t-xs c-low">{progressLabel}</span>
-                          <span className="t-xs fw-700 c-hi">{progressPercent}%</span>
-                        </div>
-                        <ProgressBar percent={progressPercent} color="var(--ag-success)" />
-                        <div className="home-commission-compact-due">
-                          {commission.status === 'REQUESTED'
-                            ? 'Awaiting approval'
-                            : commission.status === 'ACCEPTED'
-                              ? 'Ready to start'
-                              : dueLabel}
-                        </div>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-
-              {user?.role === 'artist' && (
-                <>
-                  <div className="row-between home-commissions-heading" style={{ margin: '4px 0 12px' }}>
-                    <span className="section-title">Incoming Commission Requests</span>
-                    <span className="t-xs c-low">{pendingRequestCount} pending</span>
-                  </div>
-                  {myCommissions.filter((commission) => commission.status === 'REQUESTED' && !commission.isClient).map((commission) => (
-                    <article className="card home-incoming-request-card" key={`request-${commission.id}`} style={{ marginBottom: 10 }}>
-                      <div className="row-between" style={{ marginBottom: 7 }}>
-                        <div>
-                          <div className="t-sm fw-700">{commission.counterparty?.name ?? 'Unknown client'}</div>
-                          {commission.counterparty?.username && <div className="t-xs c-low">@{commission.counterparty.username}</div>}
-                        </div>
-                        <span className="badge badge-warning">REQUESTED</span>
-                      </div>
-                      <div className="t-sm fw-600" style={{ marginBottom: 4 }}>{commission.title}</div>
-                      {commissionSnapshotLabel(commission) && (
-                        <div className="t-xs c-low" style={{ marginBottom: 4 }}>{commissionSnapshotLabel(commission)}</div>
-                      )}
-                      <div className="t-xs c-mid" style={{ lineHeight: 1.5 }}>{commission.description || 'No description provided.'}</div>
-                      <div className="t-xs c-low" style={{ marginTop: 8 }}>
-                        Requested {new Date(commission.requested_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
-                      </div>
-                      <div className="row gap-10 home-request-actions" style={{ marginTop: 12 }}>
-                        <button type="button" className="btn btn-primary btn-sm" style={{ flex: 1 }} disabled={Boolean(commissionActionId)} onClick={() => void handleAcceptCommission(commission.id)}>
-                          {commissionActionId === commission.id ? 'Saving…' : 'Accept Commission'}
-                        </button>
-                        <button type="button" className="btn btn-ghost btn-sm" style={{ flex: 1 }} disabled={Boolean(commissionActionId)} onClick={() => void handleRejectCommission(commission.id)}>
-                          Reject
-                        </button>
-                      </div>
-                    </article>
-                  ))}
-                </>
-              )}
-            </>
-          )}
-
-          {user?.role === 'artist' && (
-            <button
-              type="button"
-              className="tap-card card home-shield-card"
-              onClick={() => navigate('/shield')}
-              style={{ marginBottom: 20 }}
-            >
-              <div className="row gap-10">
-                <div className="home-shield-icon">
-                  <Icon name="shield" style={{ stroke: 'var(--ag-success)' }} />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="row-between">
-                    <span className="t-sm fw-700">Shield Active</span>
-                    <span className="badge badge-success">Live</span>
-                  </div>
-                  <div className="t-xs c-low">Protection status available</div>
-                </div>
-                <Icon name="chevron-r" style={{ width: 15, height: 15, stroke: 'var(--ag-text-low)' }} />
-              </div>
-            </button>
-          )}
-
-          {!isSupabaseConfigured && (
-            <>
-              <div className="row-between home-commissions-heading" style={{ marginBottom: 12 }}>
-                <span className="section-title">Active Commissions</span>
-              </div>
-
-              <div className="card t-sm c-mid" style={{ textAlign: 'center', marginBottom: 20 }}>
-                No active commission data is available yet.
-              </div>
-            </>
-          )}
-        </div>
-
-        <div className="dash-side home-activity-card">
-          <div className="row-between" style={{ marginBottom: 12 }}>
-            <span className="section-title">Recent Activity</span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingBottom: 6 }}>
-            {isSupabaseConfigured ? (
-              notificationsError ? (
-                <div className="t-xs c-low">Recent activity unavailable.</div>
-              ) : recentCommissionActivity.length === 0 ? (
-                <div className="t-xs c-low">No recent commission activity.</div>
-              ) : recentCommissionActivity.map((notification) => (
-                <div className="row gap-10" key={notification.id}>
-                  <div
-                    style={{
-                      width: 30,
-                      height: 30,
-                      borderRadius: '50%',
-                      background: 'var(--ag-surface-2)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
+                    className={`home-stat home-stat-${stat.tone}`}
+                    aria-label={`${stat.value} ${stat.label.toLowerCase()} commissions`}
+                    aria-pressed={commissionTab === stat.key}
+                    onClick={() => {
+                      setCommissionTab(stat.key);
+                      commissionSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     }}
                   >
-                    <Icon name="bell" style={{ width: 14, height: 14, stroke: 'var(--ag-accent)' }} />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="t-xs c-hi fw-600">{notification.title}</div>
-                    <div className="t-xs c-mid">{notification.message}</div>
-                    <div className="t-xs c-low">{relativeNotificationTime(notification.created_at)}</div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="t-xs c-low">No recent activity data is available yet.</div>
-            )}
+                    <div className="home-stat-label">{stat.label}</div>
+                    <div className="home-stat-value" aria-hidden="true">{stat.value}</div>
+                  </button>
+                ))}
+              </div>
+            </aside>
+
+            <aside className="card home-activity-card ag-liquid-glass-soft">
+              <div className="row-between home-activity-heading">
+                <span className="section-title">Recent Activity</span>
+                <button
+                  type="button"
+                  className="home-refresh-button"
+                  aria-label="Refresh dashboard"
+                  title="Refresh dashboard"
+                  disabled={loadingCommissions || loadingPaidCommissionPayments || loadingNotifications || refreshingDashboard}
+                  onClick={() => void refreshDashboard()}
+                >
+                  <Icon name="refresh" />
+                </button>
+              </div>
+              <div className="home-activity-list">
+                {isSupabaseConfigured ? (
+                  loadingNotifications ? (
+                    <div className="t-xs c-low" role="status">Loading recent activity…</div>
+                  ) : notificationsError ? (
+                    <div className="home-activity-error" role="alert">
+                      <div className="t-xs c-low">Recent activity unavailable: {notificationsError}</div>
+                      <button type="button" className="link-sm" onClick={() => void refreshNotifications()}>Retry</button>
+                    </div>
+                  ) : recentCommissionActivity.length === 0 ? (
+                    <div className="t-xs c-low home-empty-activity">No recent commission activity.</div>
+                  ) : recentCommissionActivity.map((notification) => (
+                    <div className="row gap-10 home-activity-row" key={notification.id}>
+                      <div className="home-activity-icon">
+                        <Icon name="bell" style={{ width: 14, height: 14, stroke: 'var(--ag-accent)' }} />
+                      </div>
+                      <div className="home-activity-copy">
+                        <div className="t-xs c-hi fw-600">{notification.title}</div>
+                        <div className="t-xs c-mid">{notification.message}</div>
+                        <div className="t-xs c-low">{relativeNotificationTime(notification.created_at)}</div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="t-xs c-low home-empty-activity">No recent activity data is available yet.</div>
+                )}
+              </div>
+            </aside>
           </div>
+        </div>
+
+        <div className="dashboard-lower-grid">
+          <section className="home-commissions-panel" ref={commissionSectionRef}>
+            {isSupabaseConfigured && (
+              <>
+                <div className="row-between home-commissions-heading">
+                  <span className="section-title">Your Commissions</span>
+                  {user?.role === 'client' && (
+                    <button type="button" className="btn btn-primary btn-sm home-start-commission-button" onClick={() => navigate('/commission/start')}>
+                      + Start Commission
+                    </button>
+                  )}
+                </div>
+
+                <div className="segmented home-commission-tabs" role="tablist" aria-label="Commission history">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={commissionTab === 'active'}
+                    className={`segmented-option${commissionTab === 'active' ? ' active' : ''}`}
+                    onClick={() => setCommissionTab('active')}
+                  >
+                    Active
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={commissionTab === 'pending'}
+                    className={`segmented-option${commissionTab === 'pending' ? ' active' : ''}`}
+                    onClick={() => setCommissionTab('pending')}
+                  >
+                    Pending
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={commissionTab === 'completed'}
+                    className={`segmented-option${commissionTab === 'completed' ? ' active' : ''}`}
+                    onClick={() => setCommissionTab('completed')}
+                  >
+                    Completed
+                  </button>
+                </div>
+
+                {loadingCommissions && (
+                  <div className="card home-empty-state-card ag-liquid-glass-soft t-xs c-low">Loading dashboard...</div>
+                )}
+
+                {!loadingCommissions && commissionLoadError && (
+                  <div className="card home-empty-state-card ag-liquid-glass-soft t-sm c-mid" role="alert">
+                    <span>Could not load dashboard commissions: {commissionLoadError}</span>
+                    <button type="button" className="link-sm" onClick={() => void refreshDashboard()}>Retry</button>
+                  </div>
+                )}
+
+                {!loadingCommissions && !commissionLoadError && commissionTab === 'active' && activeCommissions.length === 0 && (
+                  <div className="card home-empty-state-card ag-liquid-glass-soft home-empty-empty-state">
+                    <div className="home-empty-state-icon"><Icon name="palette" /></div>
+                    <div className="home-empty-state-title">No active commissions yet</div>
+                    <div className="home-empty-state-copy">Start a new commission or explore the marketplace to collaborate with artists.</div>
+                  </div>
+                )}
+
+                {!loadingCommissions && !commissionLoadError && commissionTab === 'pending' && pendingCommissions.length === 0 && (
+                  <div className="card home-empty-state-card ag-liquid-glass-soft home-empty-empty-state">
+                    <div className="home-empty-state-icon"><Icon name="palette" /></div>
+                    <div className="home-empty-state-title">No pending commissions</div>
+                    <div className="home-empty-state-copy">Requests awaiting a response will appear here.</div>
+                  </div>
+                )}
+
+                {!loadingCommissions && !commissionLoadError && commissionTab === 'completed' && completedCommissions.length === 0 && (
+                  <div className="card home-empty-state-card ag-liquid-glass-soft home-empty-empty-state">
+                    <div className="home-empty-state-icon"><Icon name="palette" /></div>
+                    <div className="home-empty-state-title">No completed commissions yet</div>
+                    <div className="home-empty-state-copy">Your finished work will appear here once a commission is delivered.</div>
+                  </div>
+                )}
+
+                {visibleCommissions.map((commission, i) => {
+                  const rawProgress = Number(commissionProgressById[commission.id] ?? 0);
+                  const progressUnavailable = commission.status !== 'REQUESTED' && Boolean(commissionProgressFailedById[commission.id]);
+                  const progressPercent = commission.status === 'COMPLETED'
+                    ? 100
+                    : commission.status === 'REQUESTED' || progressUnavailable
+                      ? null
+                      : Math.max(0, Math.min(100, Number.isFinite(rawProgress) ? rawProgress : 0));
+                  const dueAt = getCommissionDueAt(commission);
+                  const dueLabel = dueAt
+                    ? `Due ${new Date(dueAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
+                    : 'No deadline set';
+                  const progressLabel =
+                    commission.status === 'REQUESTED'
+                      ? 'Awaiting approval'
+                      : progressUnavailable
+                        ? 'Progress unavailable'
+                        : commission.status === 'ACCEPTED'
+                          ? 'Accepted'
+                          : commission.status === 'REVISION_REQUESTED'
+                            ? 'Revision requested'
+                            : progressPercent !== null && progressPercent > 0
+                              ? `${progressPercent}% complete`
+                              : 'Not started';
+
+                  return (
+                    <button
+                      key={commission.id}
+                      type="button"
+                      className="tap-card card home-commission-card ag-liquid-glass-soft"
+                      style={{ marginBottom: i === visibleCommissions.length - 1 ? 20 : 10 }}
+                      onClick={() => navigate(`/home/workspace/${commission.id}`)}
+                    >
+                      <div className="home-commission-card-header">
+                        <div
+                          className="avatar avatar-sm"
+                          style={commission.counterparty?.avatar_data_url ? { backgroundImage: `url(${commission.counterparty.avatar_data_url})`, backgroundSize: 'cover' } : {}}
+                        >
+                          {!commission.counterparty?.avatar_data_url && initialsFor(commission.counterparty?.name ?? '?')}
+                        </div>
+                        <div className="home-commission-card-body">
+                          <div className="row-between">
+                            <span className="t-sm fw-700 home-commission-title">{commission.title}</span>
+                            <span className={`badge ${commission.status === 'REQUESTED' ? 'badge-warning' : 'badge-accent'}`}>
+                              {compactCommissionStatusLabel(commission).replace(' ', '\u00A0')}
+                            </span>
+                          </div>
+                          <div className="home-commission-meta">
+                            {commission.counterparty?.name ?? 'Unknown'} · {new Date(commission.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                          </div>
+                          <div className="home-commission-progress-row">
+                            <span className="t-xs c-low">{progressLabel}</span>
+                            {progressPercent !== null && <span className="t-xs fw-700 c-hi">{progressPercent}%</span>}
+                          </div>
+                          {progressPercent !== null && <ProgressBar percent={progressPercent} color="var(--ag-success)" />}
+                          <div className="home-commission-compact-due">
+                            {commission.status === 'REQUESTED'
+                              ? 'Awaiting approval'
+                              : commission.status === 'ACCEPTED'
+                                ? 'Ready to start'
+                                : dueLabel}
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+
+                {user?.role === 'artist' && commissionTab === 'pending' && pendingRequestCount > 0 && (
+                  <>
+                    <div className="row-between home-commissions-heading secondary-heading">
+                      <span className="section-title">Incoming Commission Requests</span>
+                      <span className="t-xs c-low">{pendingRequestCount} pending</span>
+                    </div>
+                    {pendingCommissions.map((commission) => (
+                      <article className="card home-incoming-request-card" key={`request-${commission.id}`} style={{ marginBottom: 10 }}>
+                        <div className="row-between" style={{ marginBottom: 7 }}>
+                          <div>
+                            <div className="t-sm fw-700">{commission.counterparty?.name ?? 'Unknown client'}</div>
+                            {commission.counterparty?.username && <div className="t-xs c-low">@{commission.counterparty.username}</div>}
+                          </div>
+                          <span className="badge badge-warning">REQUESTED</span>
+                        </div>
+                        <div className="t-sm fw-600" style={{ marginBottom: 4 }}>{commission.title}</div>
+                        {commissionSnapshotLabel(commission) && (
+                          <div className="t-xs c-low" style={{ marginBottom: 4 }}>{commissionSnapshotLabel(commission)}</div>
+                        )}
+                        <div className="t-xs c-mid" style={{ lineHeight: 1.5 }}>{commission.description || 'No description provided.'}</div>
+                        <div className="t-xs c-low" style={{ marginTop: 8 }}>
+                          Requested {new Date(commission.requested_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                        </div>
+                        <div className="row gap-10 home-request-actions" style={{ marginTop: 12 }}>
+                          <button type="button" className="btn btn-primary btn-sm" style={{ flex: 1 }} disabled={Boolean(commissionActionId)} onClick={() => void handleAcceptCommission(commission.id)}>
+                            {commissionActionId === commission.id ? 'Saving…' : 'Accept Commission'}
+                          </button>
+                          <button type="button" className="btn btn-ghost btn-sm" style={{ flex: 1 }} disabled={Boolean(commissionActionId)} onClick={() => void handleRejectCommission(commission.id)}>
+                            Reject
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                  </>
+                )}
+              </>
+            )}
+
+            {!isSupabaseConfigured && (
+              <>
+                <div className="row-between home-commissions-heading">
+                  <span className="section-title">Active Commissions</span>
+                </div>
+                <div className="card home-empty-state-card ag-liquid-glass-soft t-sm c-mid">No active commission data is available yet.</div>
+              </>
+            )}
+          </section>
+
         </div>
       </div>
       {toast}

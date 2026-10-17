@@ -1,0 +1,11 @@
+.commission-start-header {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 20px);
+  padding-bottom: 20px;
+}
+
+@media (min-width: 768px) {
+  .commission-start-header {
+    padding-top: 26px;
+    padding-bottom: 22px;
+  }
+}

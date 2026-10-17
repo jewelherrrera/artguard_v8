@@ -467,6 +467,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           avatarStyle: resolvedSender?.avatar_data_url
             ? { backgroundImage: `url(${resolvedSender.avatar_data_url})`, backgroundSize: 'cover' }
             : {},
+          avatarDataUrl: resolvedSender?.avatar_data_url,
           presence,
           lastSeenLabel: relativeTimeLabel(resolvedSender?.last_seen_at),
           dayLabel: new Date(row.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
@@ -987,6 +988,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           avatarStyle: other.avatar_data_url
             ? { backgroundImage: `url(${other.avatar_data_url})`, backgroundSize: 'cover' }
             : {},
+          avatarDataUrl: other.avatar_data_url,
           presence: onlineUserIds.has(other.id) || heartbeatSaysOnline(other.last_seen_at) ? 'online' : 'recent',
           lastSeenLabel: relativeTimeLabel(other.last_seen_at),
           dayLabel: 'Start a conversation',

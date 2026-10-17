@@ -88,7 +88,10 @@ ion-content.auth-viewport::part(background) {
     min-height: 0;
     overflow-y: auto;
     justify-content: center;
-    background: color-mix(in srgb, var(--ag-bg-2) 92%, transparent);
+    background: linear-gradient(140deg, var(--ag-glass-reflection), transparent 48%), var(--ag-glass-soft-bg);
+    border-left: 1px solid var(--ag-glass-border);
+    -webkit-backdrop-filter: blur(var(--ag-glass-blur-soft));
+    backdrop-filter: blur(var(--ag-glass-blur-soft));
   }
 
   .auth-card--signup .auth-art-panel {

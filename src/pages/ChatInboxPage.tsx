@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ScreenShell } from '../components/ui/ScreenShell';
 import { BottomNav } from '../components/ui/BottomNav';
 import { Icon } from '../assets/icons';
+import { ProfileAvatar } from '../components/ui/ProfileAvatar';
 import { useChat } from '../context/ChatContext';
 import { useAuth } from '../context/AuthContext';
 import { previewFor } from '../utils/chat';
@@ -12,8 +13,12 @@ import './ChatInboxPage.css';
 
 export function ChatInboxPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const { conversations, searchUsers, startConversation } = useChat();
+  const [isDesktopLayout, setIsDesktopLayout] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1100px)').matches,
+  );
   const [search, setSearch] = useState('');
   const [people, setPeople] = useState<Awaited<ReturnType<typeof searchUsers>>>([]);
   const [searchingPeople, setSearchingPeople] = useState(false);
@@ -24,6 +29,15 @@ export function ChatInboxPage() {
     return conversations.filter((c) => c.name.toLowerCase().includes(term) || previewFor(c).toLowerCase().includes(term));
   }, [conversations, search]);
   const hasSearch = search.trim().length > 0;
+  const isInboxRoute = location.pathname.replace(/\/+$/, '') === '/chat';
+
+  useEffect(() => {
+    const desktopMedia = window.matchMedia('(min-width: 1100px)');
+    const updateDesktopLayout = () => setIsDesktopLayout(desktopMedia.matches);
+    updateDesktopLayout();
+    desktopMedia.addEventListener('change', updateDesktopLayout);
+    return () => desktopMedia.removeEventListener('change', updateDesktopLayout);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -97,12 +111,11 @@ export function ChatInboxPage() {
                     style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 8px', border: 0, background: 'transparent', textAlign: 'left' }}
                     onClick={() => void openUser(person.id)}
                   >
-                    <div
+                    <ProfileAvatar
                       className="avatar avatar-sm"
-                      style={person.avatar_data_url ? { backgroundImage: `url(${person.avatar_data_url})`, backgroundSize: 'cover' } : {}}
-                    >
-                      {person.avatar_data_url ? '' : person.name.slice(0, 2).toUpperCase()}
-                    </div>
+                      imageUrl={person.avatar_data_url}
+                      initials={person.name.slice(0, 2).toUpperCase()}
+                    />
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div className="row gap-8">
                         <span className="t-sm fw-700">{person.name}</span>
@@ -142,10 +155,12 @@ export function ChatInboxPage() {
           )}
         </div>
 
-        <div className="chat-inbox-desktop-empty" role="status">
-          <Icon name="chat" style={{ width: 44, height: 44, stroke: 'var(--ag-text-low)' }} />
-          <p className="t-sm c-mid" style={{ marginTop: 14 }}>Select a conversation to start messaging</p>
-        </div>
+        {isDesktopLayout && isInboxRoute && (
+          <div className="chat-inbox-desktop-empty" role="status">
+            <Icon name="chat" style={{ width: 44, height: 44, stroke: 'var(--ag-text-low)' }} />
+            <p className="t-sm c-mid" style={{ marginTop: 14 }}>Select a conversation to start messaging</p>
+          </div>
+        )}
       </div>
     </ScreenShell>
   );

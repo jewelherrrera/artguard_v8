@@ -8,6 +8,7 @@ import { getPublicProfile, relativeTimeLabel, type PublicProfile } from '../lib/
 import { isSupabaseConfigured } from '../lib/supabase';
 import { useMockToast } from '../components/ui/MockToast';
 import { Icon } from '../assets/icons';
+import { ProfileAvatar } from '../components/ui/ProfileAvatar';
 import { isVerifiedArtistStatus } from '../types/auth';
 
 export function UserProfilePage() {
@@ -67,9 +68,12 @@ export function UserProfilePage() {
       header={<div className="px-hd row-between"><IconButton icon="chevron-l" onClick={() => navigate(-1)} ariaLabel="Back" /><span className="h-title">Profile</span><span style={{ width: 38 }} /></div>}
     >
       <div style={{ textAlign: 'center', paddingTop: 12, marginBottom: 22 }}>
-        <div className="avatar avatar-xl" style={{ margin: '0 auto 12px', background: 'var(--ag-grad-accent)', backgroundImage: profile.avatar_data_url ? `url(${profile.avatar_data_url})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center' }}>
-          {!profile.avatar_data_url && initials}
-        </div>
+        <ProfileAvatar
+          className="avatar avatar-xl"
+          imageUrl={profile.avatar_data_url}
+          initials={initials}
+          style={{ margin: '0 auto 12px', background: 'var(--ag-grad-accent)' }}
+        />
         <div className="row" style={{ justifyContent: 'center', gap: 7 }}>
           <span style={{ fontSize: 20, fontWeight: 700 }}>{profile.name}</span>
           {profile.role === 'artist' && isVerifiedArtistStatus(profile.artist_verification_status) && (

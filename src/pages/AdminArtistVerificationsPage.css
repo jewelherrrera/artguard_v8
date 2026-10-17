@@ -99,10 +99,7 @@
   max-height: calc(100dvh - 48px);
   overflow: auto;
   padding: 16px;
-  border: 1px solid var(--ag-border);
   border-radius: var(--ag-r-lg);
-  background: var(--ag-surface);
-  box-shadow: var(--ag-shadow-glow);
 }
 
 .admin-verification-preview-modal img {

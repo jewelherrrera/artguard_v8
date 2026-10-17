@@ -29,7 +29,7 @@ function ConfirmationDialog({
 
   return (
     <div className="account-dialog-backdrop" role="presentation">
-      <section className="account-dialog" role="dialog" aria-modal="true" aria-labelledby="account-dialog-title">
+      <section className="account-dialog ag-liquid-glass-strong" role="dialog" aria-modal="true" aria-labelledby="account-dialog-title">
         <div className="account-dialog-icon">
           <Icon name="alert" />
         </div>

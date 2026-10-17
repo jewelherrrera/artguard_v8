@@ -452,6 +452,7 @@ export async function loadConversations(
         name: other.name,
         initials: initialsFor(other.name),
         avatarStyle: other.avatar_data_url ? { backgroundImage: `url(${other.avatar_data_url})`, backgroundSize: 'cover' } : {},
+        avatarDataUrl: other.avatar_data_url,
         presence: presence.presence,
         lastSeenLabel: presence.lastSeenLabel,
         dayLabel: last ? new Date(last.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'Start a conversation',

@@ -126,7 +126,7 @@ export function NotificationsPage() {
           </div>
         )}
         {!loading && !error && notifications.map((notification) => (
-          <article className={`card notification-card${notification.is_read ? '' : ' is-unread'}`} key={notification.id}>
+          <article className={`card notification-card ag-liquid-glass-soft${notification.is_read ? '' : ' is-unread'}`} key={notification.id}>
             <div className="notification-icon" aria-hidden="true">
               {notification.notification_type.startsWith('artwork_') && notification.actor_avatar_data_url ? (
                 <img src={notification.actor_avatar_data_url} alt="" />
@@ -168,7 +168,7 @@ export function NotificationsPage() {
       </main>
       {clearDialogOpen && (
         <div className="notification-dialog-backdrop" role="presentation" onClick={() => !clearing && setClearDialogOpen(false)}>
-          <section className="notification-dialog" role="dialog" aria-modal="true" aria-labelledby="clear-notifications-title" onClick={(event) => event.stopPropagation()}>
+          <section className="notification-dialog ag-liquid-glass-strong" role="dialog" aria-modal="true" aria-labelledby="clear-notifications-title" onClick={(event) => event.stopPropagation()}>
             <div className="notification-dialog-icon"><Icon name="alert" /></div>
             <h2 id="clear-notifications-title">Clear all notifications?</h2>
             <p>This cannot be undone.</p>

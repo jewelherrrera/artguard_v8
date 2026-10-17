@@ -8,6 +8,7 @@ import { IconButton } from '../components/ui/IconButton';
 import { ArtTile } from '../components/ui/ArtTile';
 import { ProtectedArtworkDisplay } from '../components/ui/ProtectedArtworkDisplay';
 import { Icon } from '../assets/icons';
+import { ProfileAvatar } from '../components/ui/ProfileAvatar';
 import { useChat } from '../context/ChatContext';
 import { useAuth } from '../context/AuthContext';
 import { navigateToFullProfile } from '../lib/profileNavigation';
@@ -105,9 +106,15 @@ export function ChatPage() {
 
   const contextConversation = conversationId ? getConversation(conversationId) : undefined;
   const [resolvedConversation, setResolvedConversation] = useState<NonNullable<typeof contextConversation> | null>(null);
-  const [loadingConversation, setLoadingConversation] = useState(false);
+  const [conversationLoadState, setConversationLoadState] = useState<{
+    id: string;
+    status: 'loading' | 'error';
+  } | null>(null);
+  const [conversationLoadAttempt, setConversationLoadAttempt] = useState(0);
 
-  const conversation = contextConversation ?? resolvedConversation;
+  const conversation = contextConversation
+    ?? (resolvedConversation?.id === conversationId ? resolvedConversation : undefined);
+  const loadConversationByIdRef = useRef(loadConversationById);
 
   const [draft, setDraft] = useState('');
   const [showMenu, setShowMenu] = useState(false);
@@ -150,6 +157,10 @@ export function ChatPage() {
   const sendInFlightRef = useRef(false);
   const readTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chatViewActiveRef = useRef(false);
+
+  useEffect(() => {
+    loadConversationByIdRef.current = loadConversationById;
+  }, [loadConversationById]);
 
   useEffect(() => {
     const otherUserId = conversation?.otherUserId;
@@ -200,22 +211,43 @@ export function ChatPage() {
     let cancelled = false;
 
     if (!conversationId || contextConversation) {
-      setLoadingConversation(false);
+      setConversationLoadState(null);
       if (contextConversation) setResolvedConversation(contextConversation);
       return;
     }
 
-    setLoadingConversation(true);
-    void loadConversationById(conversationId).then((found) => {
-      if (cancelled) return;
+    setConversationLoadState({ id: conversationId, status: 'loading' });
+    let settled = false;
+    const timeoutId = window.setTimeout(() => {
+      if (cancelled || settled) return;
+      settled = true;
+      console.error('ArtGuard: requested conversation loading timed out');
+      setResolvedConversation(null);
+      setConversationLoadState({ id: conversationId, status: 'error' });
+    }, 15000);
+
+    void loadConversationByIdRef.current(conversationId).then((found) => {
+      if (cancelled || settled) return;
+      settled = true;
+      window.clearTimeout(timeoutId);
       setResolvedConversation(found);
-      setLoadingConversation(false);
+      setConversationLoadState(found
+        ? null
+        : { id: conversationId, status: 'error' });
+    }).catch((error: unknown) => {
+      console.error('ArtGuard: requested conversation could not be opened', error);
+      if (cancelled || settled) return;
+      settled = true;
+      window.clearTimeout(timeoutId);
+      setResolvedConversation(null);
+      setConversationLoadState({ id: conversationId, status: 'error' });
     });
 
     return () => {
       cancelled = true;
+      window.clearTimeout(timeoutId);
     };
-  }, [conversationId, contextConversation, loadConversationById]);
+  }, [conversationId, contextConversation, conversationLoadAttempt]);
 
   // IMPORTANT: Ionic's router may keep inactive pages mounted. Do not mark a
   // conversation read merely because its component exists in the outlet. A
@@ -375,17 +407,36 @@ export function ChatPage() {
   }
 
   if (!conversation) {
-    if (loadingConversation) {
+    const conversationStatus = conversationLoadState?.id === conversationId
+      ? conversationLoadState.status
+      : 'loading';
+    if (conversationStatus === 'loading') {
       return (
-        <ScreenShell contentClassName="chat-thread-content">
+        <ScreenShell aside={<ChatSidebar activeId={conversationId} />} contentClassName="chat-thread-content">
           <div className="chat-empty-state">
             <div className="avatar avatar-sm" aria-hidden="true">••</div>
-            <p className="t-sm c-mid">Opening conversation…</p>
+            <p className="t-sm c-mid" role="status">Opening conversation…</p>
           </div>
         </ScreenShell>
       );
     }
-    return <Navigate to="/chat" replace />;
+    return (
+      <ScreenShell aside={<ChatSidebar activeId={conversationId} />} contentClassName="chat-thread-content">
+        <div className="chat-empty-state">
+          <p className="t-sm c-mid" role="alert">This conversation could not be loaded.</p>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => setConversationLoadAttempt((attempt) => attempt + 1)}
+          >
+            Retry
+          </button>
+          <button type="button" className="btn btn-ghost" onClick={() => navigate('/chat')}>
+            Back to inbox
+          </button>
+        </div>
+      </ScreenShell>
+    );
   }
 
   const startPress = (action: () => void) => {
@@ -705,9 +756,12 @@ export function ChatPage() {
         >
           <div className="row gap-10">
             <IconButton icon="chevron-l" onClick={() => navigate('/chat')} ariaLabel="Back to messages" />
-            <div className="avatar avatar-sm" style={conversation.avatarStyle}>
-              {conversation.initials}
-            </div>
+            <ProfileAvatar
+              className="avatar avatar-sm"
+              imageUrl={conversation.avatarDataUrl}
+              initials={conversation.initials}
+              style={conversation.avatarStyle}
+            />
             <div>
               <div className="t-sm fw-700">{conversation.name}</div>
               <div className="row gap-8">
@@ -719,7 +773,7 @@ export function ChatPage() {
           <IconButton icon="dots" onClick={() => setShowMenu((v) => !v)} ariaLabel="More options" />
 
           {showMenu && (
-            <div className="card chat-menu-dropdown">
+            <div className="card chat-menu-dropdown ag-liquid-glass-strong">
               {!conversation.otherUserId && (
                 <div className="t-xs c-low" role="note" style={{ padding: '6px 12px' }}>
                   Profile, mute, and block controls require a real account conversation.
@@ -793,7 +847,7 @@ export function ChatPage() {
             </div>
           )}
           {showAttachSheet && !messagingUnavailable && (
-            <div className="chat-composer-sheet">
+            <div className="chat-composer-sheet ag-liquid-glass-strong">
               <button type="button" className="chat-attach-row" onClick={() => void handlePickPhoto()} disabled={sendingMessage}>
                 <span className="chat-attach-icon">
                   <Icon name="image" style={{ width: 17, height: 17, stroke: 'var(--ag-text-mid)' }} />
@@ -908,7 +962,7 @@ export function ChatPage() {
           {shareArtworkOpen && (
             <div className="chat-artwork-modal-backdrop" role="presentation" onClick={() => !sharingArtwork && setShareArtworkOpen(false)}>
               <section
-                className="chat-artwork-modal card"
+                className="chat-artwork-modal card ag-liquid-glass-strong"
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="chat-share-artwork-title"
@@ -985,7 +1039,7 @@ export function ChatPage() {
           )}
 
           {showEmojiPicker && !messagingUnavailable && (
-            <div className="chat-composer-sheet">
+            <div className="chat-composer-sheet ag-liquid-glass-strong">
               <div className="row-between" style={{ padding: '2px 4px 6px' }}>
                 <span className="t-xs c-low fw-700">Emoji</span>
                 <IconButton icon="x" onClick={() => setShowEmojiPicker(false)} ariaLabel="Close emoji picker" />

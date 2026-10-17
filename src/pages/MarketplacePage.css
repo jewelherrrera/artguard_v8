@@ -15,10 +15,7 @@
 .market-filter-panel {
   margin: 0 0 14px;
   padding: 14px;
-  border: 1px solid var(--ag-border-soft);
   border-radius: var(--ag-r-md);
-  background: var(--ag-glass-bg);
-  box-shadow: var(--ag-shadow-card);
   animation: market-filter-in 0.2s ease-out;
 }
 
@@ -470,12 +467,7 @@
 .commission-post-card {
   min-width: 0;
   padding: 18px;
-  border: 1px solid var(--ag-border-soft);
   border-radius: var(--ag-r-lg);
-  background: var(--ag-glass-bg);
-  box-shadow: var(--ag-shadow-card);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
 }
 
 .commission-post-card-header {

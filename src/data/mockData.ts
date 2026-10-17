@@ -115,6 +115,7 @@ export interface Conversation {
   name: string;
   initials: string;
   avatarStyle: CSSProperties;
+  avatarDataUrl?: string | null;
   presence: PresenceStatus;
   /** Shown under the name in the conversation header when not online, e.g. "Last seen yesterday". */
   lastSeenLabel?: string;

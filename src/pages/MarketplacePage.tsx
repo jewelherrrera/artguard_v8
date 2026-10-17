@@ -1100,7 +1100,7 @@ export function MarketplacePage() {
   };
 
   const filterPanel = filtersOpen ? (
-    <div className="market-filter-panel" role="region" aria-label="Marketplace filters">
+    <div className="market-filter-panel ag-liquid-glass" role="region" aria-label="Marketplace filters">
       <div className="row-between market-filter-heading">
         <span className="t-sm fw-700">Filter results</span>
         <button type="button" className="link-sm" onClick={resetFilters} disabled={activeFilterCount === 0}>
@@ -1200,7 +1200,7 @@ export function MarketplacePage() {
   );
 
   const commissionPostFilterPanel = postFilterOpen ? (
-    <div className="market-filter-panel commission-post-filter-panel" role="region" aria-label="Commission post filters">
+    <div className="market-filter-panel commission-post-filter-panel ag-liquid-glass" role="region" aria-label="Commission post filters">
       <div className="row-between market-filter-heading">
         <span className="t-sm fw-700">Filter commission posts</span>
         <button type="button" className="link-sm" onClick={resetCommissionFilters} disabled={commissionFilterCount === 0}>
@@ -1260,7 +1260,7 @@ export function MarketplacePage() {
             />
           </div>
           {isRealCommissionFeed && activeTab === 'commissions' ? (
-            <div className="search-bar" style={{ marginBottom: 14 }}>
+            <div className="search-bar ag-liquid-glass-soft" style={{ marginBottom: 14 }}>
               <Icon name="search" style={{ width: 16, height: 16 }} />
               <input
                 type="text"
@@ -1272,7 +1272,7 @@ export function MarketplacePage() {
             </div>
           ) : (
             <>
-              <div className="search-bar" style={{ marginBottom: 14 }}>
+              <div className="search-bar ag-liquid-glass-soft" style={{ marginBottom: 14 }}>
                 <Icon name="search" style={{ width: 16, height: 16 }} />
                 <input
                   type="text"
@@ -1402,7 +1402,7 @@ export function MarketplacePage() {
                 const ownerUsername = post.owner_username ?? (isCurrentOwner ? user?.username : null);
                 const engagement = postEngagement[post.id];
                 return (
-                  <article className="commission-post-card" key={post.id}>
+                  <article className="commission-post-card ag-liquid-glass-soft" key={post.id}>
                     <div className="commission-post-card-header">
                       <div className="commission-post-author">
                         <div className="avatar avatar-md commission-post-avatar" style={avatar ? { backgroundImage: `url(${avatar})` } : undefined}>

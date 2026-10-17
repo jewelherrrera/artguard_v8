@@ -60,6 +60,19 @@ export function IconSprite() {
           strokeLinejoin="round"
         />
       </symbol>
+      <symbol id="i-palette" viewBox="0 0 24 24">
+        <path d="M12 3.5a8.5 8.5 0 100 17h1.3a2.2 2.2 0 001.4-3.9 1.4 1.4 0 01.9-2.5h1.1a4.8 4.8 0 004.8-4.8c0-3.2-3.7-5.8-9.5-5.8z" />
+        <circle cx="7.5" cy="11" r="1" />
+        <circle cx="10" cy="7.5" r="1" />
+        <circle cx="14" cy="7.5" r="1" />
+        <circle cx="17" cy="10.5" r="1" />
+      </symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24">
+        <path d="M20 7v5h-5" />
+        <path d="M4.8 9a7.5 7.5 0 0112.8-2L20 12" />
+        <path d="M4 17v-5h5" />
+        <path d="M19.2 15a7.5 7.5 0 01-12.8 2L4 12" />
+      </symbol>
       <symbol id="i-chevron-r" viewBox="0 0 24 24">
         <polyline points="9 18 15 12 9 6" />
       </symbol>
@@ -206,6 +219,8 @@ export type IconName =
   | 'search'
   | 'sliders'
   | 'star'
+  | 'palette'
+  | 'refresh'
   | 'chevron-r'
   | 'chevron-l'
   | 'plus'

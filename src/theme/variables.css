@@ -40,12 +40,12 @@
   --ag-grad-accent: linear-gradient(135deg, #2856a6 0%, #397bc9 62%, #72adff 100%);
   --ag-transition-fast: 140ms ease;
   --ag-transition-base: 200ms ease;
-  --ag-grad-bg-night: radial-gradient(ellipse 122% 96% at 10% -12%, rgba(59, 111, 205, 0.38) 0%, rgba(47, 82, 163, 0.2) 40%, transparent 76%),
-    radial-gradient(ellipse 98% 82% at 100% 28%, rgba(47, 81, 159, 0.28) 0%, transparent 78%),
-    radial-gradient(ellipse 86% 92% at 54% 50%, rgba(65, 74, 151, 0.16) 0%, transparent 80%),
-    radial-gradient(ellipse 98% 76% at 42% 112%, rgba(31, 67, 142, 0.32) 0%, transparent 74%),
-    radial-gradient(ellipse 52% 40% at 94% 0%, rgba(229, 165, 45, 0.105) 0%, transparent 80%),
-    linear-gradient(160deg, #0b1224 0%, #0f1b35 50%, #0a1328 100%);
+  --ag-grad-bg-night: radial-gradient(ellipse 120% 90% at 8% -12%, rgba(97, 136, 255, 0.22) 0%, rgba(61, 102, 196, 0.12) 28%, transparent 64%),
+    radial-gradient(ellipse 96% 74% at 100% 18%, rgba(86, 117, 214, 0.18) 0%, transparent 70%),
+    radial-gradient(ellipse 92% 84% at 52% 54%, rgba(79, 98, 190, 0.08) 0%, transparent 74%),
+    radial-gradient(ellipse 94% 78% at 44% 112%, rgba(42, 71, 156, 0.16) 0%, transparent 72%),
+    radial-gradient(ellipse 52% 42% at 88% 0%, rgba(246, 196, 83, 0.09) 0%, transparent 78%),
+    linear-gradient(160deg, #070d17 0%, #0d172c 46%, #091827 100%);
 
   /* -------- Ionic core mappings (theme-reactive via var() indirection) -------- */
   --ion-color-primary: var(--ag-primary);
@@ -116,11 +116,21 @@
   --ag-shadow-card: 0 8px 24px rgba(23, 47, 88, 0.075), 0 1px 3px rgba(23, 47, 88, 0.045);
   --ag-shadow-glow: 0 0 0 1px rgba(40, 86, 166, 0.12), 0 14px 34px rgba(40, 86, 166, 0.12);
 
-  /* "Glass" card surface (used for callouts like the Shield Active card and
-     revision-request chat bubbles). Must stay theme-reactive: a translucent
-     dark panel reads fine in dark mode but hides dark-navy light-mode text. */
-  --ag-glass-bg: rgba(250, 252, 255, 0.82);
-  --ag-glass-border: rgba(40, 66, 112, 0.13);
+  /* Liquid glass materials: light frosted surfaces remain pale enough for
+     dark-navy text while allowing the page atmosphere to show through. */
+  --ag-glass-standard-bg: rgba(250, 252, 255, 0.72);
+  --ag-glass-soft-bg: rgba(250, 252, 255, 0.86);
+  --ag-glass-strong-bg: rgba(246, 249, 255, 0.82);
+  --ag-glass-border: rgba(40, 66, 112, 0.16);
+  --ag-glass-edge: rgba(255, 255, 255, 0.78);
+  --ag-glass-reflection: rgba(255, 255, 255, 0.42);
+  --ag-glass-inner-highlight: rgba(255, 255, 255, 0.68);
+  --ag-glass-shadow: 0 10px 28px rgba(23, 47, 88, 0.1), 0 1px 3px rgba(23, 47, 88, 0.05);
+  --ag-glass-floating-shadow: 0 20px 52px rgba(23, 47, 88, 0.2), 0 2px 8px rgba(23, 47, 88, 0.08);
+  --ag-glass-blur-standard: 14px;
+  --ag-glass-blur-soft: 10px;
+  --ag-glass-blur-strong: 22px;
+  --ag-glass-bg: var(--ag-glass-standard-bg);
   --ag-sticky-bg: rgba(250, 252, 255, 0.94);
   --ag-sticky-price: #14213a;
   --ag-settings-icon-bg: rgba(40, 86, 166, 0.1);
@@ -134,11 +144,11 @@
    DARK THEME — deep blue surfaces with diffuse Starry Night light.
    ============================================================ */
 [data-theme='dark'] {
-  --ag-bg: #0b1224;
-  --ag-bg-2: #101a31;
-  --ag-surface: #172542;
-  --ag-surface-2: #203253;
-  --ag-surface-3: #2a4169;
+  --ag-bg: #070d17;
+  --ag-bg-2: #0d172c;
+  --ag-surface: #111d31;
+  --ag-surface-2: #162846;
+  --ag-surface-3: #213a5a;
   --ag-border: rgba(114, 173, 255, 0.2);
   --ag-border-soft: rgba(205, 222, 252, 0.09);
   --ag-accent: #ffe38a;
@@ -150,20 +160,31 @@
   --ag-text-mid: #b5c2d9;
   --ag-text-low: #8d9bb4;
 
-  --ag-grad-bg: radial-gradient(ellipse 118% 92% at 8% -12%, rgba(48, 94, 184, 0.3) 0%, rgba(44, 76, 151, 0.14) 38%, transparent 76%),
-    radial-gradient(ellipse 92% 78% at 100% 28%, rgba(37, 71, 146, 0.2) 0%, transparent 78%),
-    radial-gradient(ellipse 82% 92% at 54% 50%, rgba(59, 68, 139, 0.1) 0%, transparent 80%),
-    radial-gradient(ellipse 92% 74% at 40% 112%, rgba(30, 62, 130, 0.22) 0%, transparent 76%),
-    radial-gradient(ellipse 54% 42% at 94% 2%, rgba(229, 165, 45, 0.075) 0%, transparent 80%),
-    linear-gradient(160deg, #0b1224 0%, #0e1830 50%, #0a1328 100%);
+  --ag-grad-bg: radial-gradient(ellipse 120% 86% at 10% -10%, rgba(69, 107, 203, 0.26) 0%, rgba(69, 107, 203, 0.12) 28%, transparent 62%),
+    radial-gradient(ellipse 90% 74% at 100% 24%, rgba(68, 87, 167, 0.18) 0%, transparent 70%),
+    radial-gradient(ellipse 82% 96% at 52% 52%, rgba(58, 65, 122, 0.08) 0%, transparent 72%),
+    radial-gradient(ellipse 96% 76% at 40% 112%, rgba(38, 70, 145, 0.18) 0%, transparent 72%),
+    radial-gradient(ellipse 54% 42% at 92% 0%, rgba(246, 196, 83, 0.06) 0%, transparent 80%),
+    linear-gradient(160deg, #070d17 0%, #0d172c 46%, #091827 100%);
   --ag-grad-bg-feature: var(--ag-grad-bg-night);
   --ag-grad-surface: linear-gradient(145deg, rgba(32, 50, 83, 0.92), rgba(23, 37, 66, 0.98));
 
   --ag-shadow-card: 0 10px 26px rgba(2, 8, 22, 0.32), 0 1px 2px rgba(0, 0, 0, 0.2);
   --ag-shadow-glow: 0 0 0 1px rgba(114, 173, 255, 0.12), 0 14px 34px rgba(8, 25, 56, 0.42);
 
-  --ag-glass-bg: rgba(16, 26, 49, 0.78);
-  --ag-glass-border: rgba(192, 215, 255, 0.12);
+  --ag-glass-standard-bg: rgba(18, 31, 55, 0.62);
+  --ag-glass-soft-bg: rgba(17, 29, 49, 0.82);
+  --ag-glass-strong-bg: rgba(13, 24, 45, 0.74);
+  --ag-glass-border: rgba(192, 215, 255, 0.16);
+  --ag-glass-edge: rgba(225, 237, 255, 0.38);
+  --ag-glass-reflection: rgba(190, 216, 255, 0.14);
+  --ag-glass-inner-highlight: rgba(218, 232, 255, 0.1);
+  --ag-glass-shadow: 0 12px 30px rgba(2, 8, 22, 0.26), 0 1px 3px rgba(0, 0, 0, 0.18);
+  --ag-glass-floating-shadow: 0 22px 58px rgba(1, 6, 18, 0.48), 0 2px 10px rgba(0, 0, 0, 0.24);
+  --ag-glass-blur-standard: 14px;
+  --ag-glass-blur-soft: 10px;
+  --ag-glass-blur-strong: 22px;
+  --ag-glass-bg: var(--ag-glass-standard-bg);
   --ag-sticky-bg: rgba(12, 21, 40, 0.92);
   --ag-sticky-price: #f5f7fc;
   --ag-settings-icon-bg: rgba(114, 173, 255, 0.13);

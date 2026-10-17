@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ScreenShell } from '../components/ui/ScreenShell';
 import { BottomNav } from '../components/ui/BottomNav';
 import { IconButton } from '../components/ui/IconButton';
+import { ProfileAvatar } from '../components/ui/ProfileAvatar';
 import { Icon } from '../assets/icons';
 import {
   CommissionPostForm,
@@ -500,24 +501,18 @@ export function ClientProfilePage() {
         header={
           <div className="px-hd row-between">
             <IconButton icon="chevron-l" onClick={() => navigate(-1)} ariaLabel="Back" />
-            <span className="h-title">Client Profile</span>
+            <span className="h-title profile-title-font">Client Profile</span>
             <span style={{ width: 38 }} />
           </div>
         }
       >
         <div style={{ textAlign: 'center', paddingTop: 12, marginBottom: 22 }}>
-          <div
+          <ProfileAvatar
             className="avatar avatar-xl"
-            style={{
-              margin: '0 auto 12px',
-              background: 'var(--ag-grad-accent)',
-              backgroundImage: viewedClient.avatar_data_url ? `url("${viewedClient.avatar_data_url}")` : undefined,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-            }}
-          >
-            {!viewedClient.avatar_data_url && viewedClientInitials}
-          </div>
+            imageUrl={viewedClient.avatar_data_url}
+            initials={viewedClientInitials}
+            style={{ margin: '0 auto 12px', background: 'var(--ag-grad-accent)' }}
+          />
           <div style={{ fontSize: 20, fontWeight: 700 }}>{viewedClient.name}</div>
           <div className="t-sm c-low" style={{ marginTop: 3 }}>@{viewedClient.username} · Client</div>
         </div>
@@ -572,25 +567,19 @@ export function ClientProfilePage() {
     <ScreenShell
       header={
         <div className="px-hd row-between">
-          <span className="h-title">My Profile</span>
+          <span className="h-title profile-title-font">My Profile</span>
           <IconButton icon="dots" onClick={() => navigate('/profile/settings')} ariaLabel="Settings" />
         </div>
       }
       footer={<BottomNav active="profile" />}
     >
       <div style={{ textAlign: 'center', marginBottom: 18 }}>
-        <div
+        <ProfileAvatar
           className="avatar avatar-xl"
-          style={{
-            margin: '0 auto 10px',
-            background: 'var(--ag-grad-accent)',
-            backgroundImage: user?.avatarDataUrl ? `url(${user.avatarDataUrl})` : undefined,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-          }}
-        >
-          {!user?.avatarDataUrl && initials}
-        </div>
+          imageUrl={user?.avatarDataUrl}
+          initials={initials}
+          style={{ margin: '0 auto 10px', background: 'var(--ag-grad-accent)' }}
+        />
         <div style={{ fontSize: 19, fontWeight: 700 }}>{user?.name || 'Client'}</div>
         <div className="t-xs c-low" style={{ marginBottom: 10 }}>
           @{usernameFromEmail(user?.email)}
@@ -659,7 +648,7 @@ export function ClientProfilePage() {
             ) : (
               <div className="stack-grid client-profile-direct-request-preview">
                 {directRequests.slice(0, 3).map((commission) => (
-                  <article className="card client-profile-direct-request-card" key={commission.id}>
+                  <article className="card client-profile-direct-request-card ag-liquid-glass-soft" key={commission.id}>
                     <div className="client-profile-direct-request-heading">
                       <span className="t-sm fw-700 client-profile-direct-request-title">{commission.title}</span>
                       <span className={`badge ${COMMISSION_STATUS_BADGE[commission.status]}`}>{commission.status.replaceAll('_', ' ')}</span>
@@ -711,15 +700,14 @@ export function ClientProfilePage() {
                       const engagement = publicPostEngagement[post.id];
                       const isPostOwner = Boolean(user && post.owner_id === user.id && post.owner_role === user.role);
                       return (
-                        <article className="commission-post-card" key={post.id}>
+                        <article className="commission-post-card ag-liquid-glass-soft" key={post.id}>
                           <div className="commission-post-card-header">
                             <div className="commission-post-author">
-                              <div
+                              <ProfileAvatar
                                 className="avatar avatar-md commission-post-avatar"
-                                style={user?.avatarDataUrl ? { backgroundImage: `url(${user.avatarDataUrl})` } : undefined}
-                              >
-                                {!user?.avatarDataUrl && initials}
-                              </div>
+                                imageUrl={user?.avatarDataUrl}
+                                initials={initials}
+                              />
                               <div className="commission-post-author-copy">
                                 <div className="t-sm fw-700 commission-post-author-name">{user?.name || 'Client'}</div>
                                 <div className="t-xs c-low">@{usernameFromEmail(user?.email)} · Client · {formatPostedDate(post.created_at)}</div>
@@ -949,12 +937,11 @@ export function ClientProfilePage() {
                       {profilePostApplications.map((application) => (
                         <article className="commission-applicant-card" key={application.id}>
                           <div className="commission-post-author">
-                            <div
+                            <ProfileAvatar
                               className="avatar avatar-md commission-post-avatar"
-                              style={application.applicant_avatar_data_url ? { backgroundImage: `url(${application.applicant_avatar_data_url})` } : undefined}
-                            >
-                              {!application.applicant_avatar_data_url && application.applicant_name.slice(0, 1).toUpperCase()}
-                            </div>
+                              imageUrl={application.applicant_avatar_data_url}
+                              initials={application.applicant_name.slice(0, 1).toUpperCase()}
+                            />
                             <div className="commission-post-author-copy">
                               <div className="t-sm fw-700 commission-post-author-name">{application.applicant_name}</div>
                               <div className="t-xs c-low">@{application.applicant_username} · Artist</div>
@@ -1042,12 +1029,11 @@ export function ClientProfilePage() {
                       {profilePostComments.map((comment) => (
                         <article className="commission-comment-card" key={comment.id}>
                           <div className="commission-comment-author">
-                            <div
+                            <ProfileAvatar
                               className="avatar avatar-sm commission-post-avatar"
-                              style={comment.author_avatar_data_url ? { backgroundImage: `url(${comment.author_avatar_data_url})` } : undefined}
-                            >
-                              {!comment.author_avatar_data_url && comment.author_name.slice(0, 1).toUpperCase()}
-                            </div>
+                              imageUrl={comment.author_avatar_data_url}
+                              initials={comment.author_name.slice(0, 1).toUpperCase()}
+                            />
                             <div className="commission-comment-author-copy">
                               <div className="t-sm fw-700">{comment.author_name}</div>
                               <div className="t-xs c-low">{comment.author_username ? `@${comment.author_username} · ` : ''}{new Date(comment.created_at).toLocaleString()}</div>
@@ -1091,7 +1077,7 @@ export function ClientProfilePage() {
             </div>
             <div className="client-profile-direct-requests-list">
               {isRealClient ? directRequests.map((commission) => (
-                <article className="card client-profile-direct-request-card" key={commission.id}>
+                <article className="card client-profile-direct-request-card ag-liquid-glass-soft" key={commission.id}>
                   <div className="client-profile-direct-request-heading">
                     <span className="t-sm fw-700 client-profile-direct-request-title">{commission.title}</span>
                     <span className={`badge ${COMMISSION_STATUS_BADGE[commission.status]}`}>{commission.status.replaceAll('_', ' ')}</span>
@@ -1106,7 +1092,7 @@ export function ClientProfilePage() {
                   )}
                 </article>
               )) : requests.map((request) => (
-                <article className="card client-profile-direct-request-card" key={request.id}>
+                <article className="card client-profile-direct-request-card ag-liquid-glass-soft" key={request.id}>
                   <div className="client-profile-direct-request-heading">
                     <span className="t-sm fw-700 client-profile-direct-request-title">{request.title}</span>
                     <span className={`badge ${STATUS_LABEL[request.status].badge}`}>{STATUS_LABEL[request.status].label}</span>

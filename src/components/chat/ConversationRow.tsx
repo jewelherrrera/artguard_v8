@@ -1,4 +1,5 @@
 import type { Conversation } from '../../data/mockData';
+import { ProfileAvatar } from '../ui/ProfileAvatar';
 import { previewFor } from '../../utils/chat';
 
 interface ConversationRowProps {
@@ -22,9 +23,12 @@ export function ConversationRow({ conversation, active, onOpen }: ConversationRo
       onClick={() => onOpen(conversation.id)}
     >
       <div className="chat-list-avatar-wrap">
-        <div className="avatar avatar-md" style={conversation.avatarStyle}>
-          {conversation.initials}
-        </div>
+        <ProfileAvatar
+          className="avatar avatar-md"
+          imageUrl={conversation.avatarDataUrl}
+          initials={conversation.initials}
+          style={conversation.avatarStyle}
+        />
         <span className={`presence-dot presence-${conversation.presence}`} />
       </div>
 

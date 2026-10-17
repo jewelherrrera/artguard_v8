@@ -32,10 +32,7 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 24px;
-  border: 1px solid var(--ag-border);
   border-radius: var(--ag-r-lg);
-  background: var(--ag-surface);
-  box-shadow: 0 18px 60px rgba(3, 5, 16, 0.35);
 }
 
 .account-dialog-icon {

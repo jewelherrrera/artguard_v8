@@ -42,6 +42,7 @@ import {
   type OwnerCommissionPostApplication,
 } from '../lib/supabaseCommissionPosts';
 import { ProtectedArtworkDisplay } from '../components/ui/ProtectedArtworkDisplay';
+import { ProfileAvatar } from '../components/ui/ProfileAvatar';
 import './MarketplacePage.css';
 import './ArtistProfilePage.css';
 
@@ -56,7 +57,6 @@ interface ArtistProfileView {
   verified: boolean;
   acceptingCommissions?: boolean | null;
   verificationStatus?: string;
-  coverGradient?: string;
   rating?: number;
   reviewCount?: number;
   completed?: number;
@@ -318,11 +318,11 @@ export function ArtistProfilePage() {
   }
 
   if (isRealSelf && realProfileLoading) {
-    return <ScreenShell header={<div className="px-hd row-between"><span className="h-title" style={{ fontSize: 19 }}>Profile</span></div>} footer={<BottomNav active="profile" />}><div className="card t-sm c-mid" style={{ textAlign: 'center' }}>Loading artist profile…</div></ScreenShell>;
+    return <ScreenShell header={<div className="px-hd row-between"><span className="h-title profile-title-font" style={{ fontSize: 19 }}>Profile</span></div>} footer={<BottomNav active="profile" />}><div className="card t-sm c-mid" style={{ textAlign: 'center' }}>Loading artist profile…</div></ScreenShell>;
   }
 
   if (isRealSelf && (!realProfile || realProfileError)) {
-    return <ScreenShell header={<div className="px-hd row-between"><span className="h-title" style={{ fontSize: 19 }}>Profile</span></div>} footer={<BottomNav active="profile" />}><div className="card t-sm c-mid" style={{ textAlign: 'center' }}>{realProfileError ?? 'Artist profile not found.'}</div></ScreenShell>;
+    return <ScreenShell header={<div className="px-hd row-between"><span className="h-title profile-title-font" style={{ fontSize: 19 }}>Profile</span></div>} footer={<BottomNav active="profile" />}><div className="card t-sm c-mid" style={{ textAlign: 'center' }}>{realProfileError ?? 'Artist profile not found.'}</div></ScreenShell>;
   }
 
   if (!isSelf && !publicArtist && (!realProfile || realProfileError)) {
@@ -347,7 +347,7 @@ export function ArtistProfilePage() {
         name: realProfile!.name,
         handle: `@${realProfile!.username}`,
         initials: realProfile!.name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join(''),
-        avatarStyle: realProfile!.avatar_data_url ? { backgroundImage: `url(${realProfile!.avatar_data_url})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {},
+        avatarStyle: {},
         avatarDataUrl: realProfile!.avatar_data_url,
         tags: realProfile!.interests ?? [],
         bio: realProfile!.bio ?? '',
@@ -375,7 +375,6 @@ export function ArtistProfilePage() {
         pricing: CURRENT_ARTIST.pricing,
         verified: isVerifiedArtistStatus(user?.artistVerificationStatus),
         verificationStatus: user?.artistVerificationStatus,
-        coverGradient: 'linear-gradient(160deg, #1D5C8C 0%, #2E86C9 45%, #E8B23D 100%)',
         startingPrice: CURRENT_ARTIST.pricing[0]?.price ?? 0,
         source: 'mock',
       }
@@ -385,7 +384,7 @@ export function ArtistProfilePage() {
           name: realProfile!.name,
           handle: `@${realProfile!.username}`,
           initials: realProfile!.name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join(''),
-          avatarStyle: realProfile!.avatar_data_url ? { backgroundImage: `url(${realProfile!.avatar_data_url})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {},
+          avatarStyle: {},
           avatarDataUrl: realProfile!.avatar_data_url,
           tags: realProfile!.interests ?? [],
           bio: realProfile!.bio ?? '',
@@ -403,13 +402,13 @@ export function ArtistProfilePage() {
     const reviewCards = (reviews: ArtistReview[]) => reviews.map((review) => (
       <article className="card" key={review.review_id} style={{ padding: '14px 16px', minWidth: 0, overflowWrap: 'anywhere' }}>
         <div className="row gap-10" style={{ alignItems: 'flex-start', minWidth: 0 }}>
-          <div
+          <ProfileAvatar
             className="avatar avatar-sm"
-            aria-hidden="true"
-            style={review.reviewer_avatar_data_url ? { backgroundImage: `url(${review.reviewer_avatar_data_url})`, backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0 } : { flexShrink: 0 }}
-          >
-            {!review.reviewer_avatar_data_url && initialsFor(review.reviewer_display_name || 'Client')}
-          </div>
+            ariaHidden
+            imageUrl={review.reviewer_avatar_data_url}
+            initials={initialsFor(review.reviewer_display_name || 'Client')}
+            style={{ flexShrink: 0 }}
+          />
           <div style={{ minWidth: 0, flex: 1 }}>
             <div className="row-between" style={{ alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
               <div style={{ minWidth: 0 }}>
@@ -666,61 +665,24 @@ export function ArtistProfilePage() {
     }
   };
 
-  const profileCover = (
-    <div className="artist-cover" style={{ background: profile.coverGradient }}>
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              backgroundImage:
-                'repeating-linear-gradient(135deg, rgba(255,255,255,0.08) 0 2px, transparent 2px 16px)',
-            }}
-          />
-          <div
-            className="row-between"
-            style={{ position: 'relative', padding: '0 18px', paddingTop: 'calc(env(safe-area-inset-top, 0px) + 14px)' }}
-          >
-            {isSelf ? (
-              <span />
-            ) : (
-              <IconButton
-                icon="chevron-l"
-                onClick={() => navigate(-1)}
-                ariaLabel="Back"
-                style={{ background: 'rgba(0,0,0,0.25)', borderColor: 'rgba(255,255,255,0.2)' }}
-              />
-            )}
-            {isSelf ? (
-              <IconButton
-                icon="dots"
-                onClick={() => navigate('/profile/settings')}
-                ariaLabel="Settings"
-                style={{ background: 'rgba(0,0,0,0.25)', borderColor: 'rgba(255,255,255,0.2)' }}
-              />
-            ) : (
-              <OptionsMenu
-                ariaLabel="More options"
-                triggerStyle={{ background: 'rgba(0,0,0,0.25)', borderColor: 'rgba(255,255,255,0.2)' }}
-                items={[
-                  { label: 'Report artist', onClick: () => showToast(`${profile.name} reported (mock)`) },
-                  { label: 'Block artist', onClick: () => showToast(`${profile.name} blocked (mock)`), danger: true },
-                ]}
-              />
-            )}
-          </div>
-          <div className="artist-cover-inner">
-            <div
-              className="avatar avatar-xl artist-avatar"
-              style={{
-                ...profile.avatarStyle,
-                ...(profile.avatarDataUrl
-                  ? { backgroundImage: `url(${profile.avatarDataUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-                  : {}),
-              }}
-            >
-              {!profile.avatarDataUrl && profile.initials}
-            </div>
-          </div>
+  const profileHeaderControls = (
+    <div className="artist-profile-header-controls">
+      {!isSelf ? (
+        <IconButton icon="chevron-l" onClick={() => navigate(-1)} ariaLabel="Back" />
+      ) : (
+        <span />
+      )}
+      {isSelf ? (
+        <IconButton icon="dots" onClick={() => navigate('/profile/settings')} ariaLabel="Settings" />
+      ) : (
+        <OptionsMenu
+          ariaLabel="More options"
+          items={[
+            { label: 'Report artist', onClick: () => showToast(`${profile.name} reported (mock)`) },
+            { label: 'Block artist', onClick: () => showToast(`${profile.name} blocked (mock)`), danger: true },
+          ]}
+        />
+      )}
     </div>
   );
 
@@ -772,92 +734,87 @@ export function ArtistProfilePage() {
         )
       }
     >
-      {profileCover}
       <div className="app-content-inner artist-profile-content">
-        <div className="row-between" style={{ alignItems: 'flex-start' }}>
-          <div>
-            <div className="row gap-8">
-              <span style={{ fontSize: 19, fontWeight: 700 }}>{profile.name}</span>
-              {profile.verified && (
-                <Icon
-                  name="check-circle"
-                  style={{ width: 15, height: 15, stroke: 'var(--ag-sky)', fill: 'rgba(46,134,201,0.2)' }}
-                />
-              )}
-              {isSelf && !profile.verified && profile.verificationStatus === 'pending' && (
-                <span className="t-xs c-warning">Verification Pending</span>
-              )}
-              {isSelf && !profile.verified && profile.verificationStatus === 'rejected' && (
-                <span className="t-xs c-danger">Verification Needs Revision</span>
-              )}
+        <section className="artist-profile-header" aria-label="Artist profile">
+          {profileHeaderControls}
+          <ProfileAvatar
+            className="avatar avatar-xl artist-avatar"
+            imageUrl={profile.avatarDataUrl}
+            initials={profile.initials}
+            style={profile.avatarStyle}
+          />
+
+          <div className="artist-profile-info">
+            <div className="artist-profile-identity">
+              <div className="artist-profile-username">{profile.handle}</div>
+              <div className="artist-profile-display-name">
+                <span>{profile.name}</span>
+                {profile.verified && (
+                  <Icon
+                    name="check-circle"
+                    style={{ width: 16, height: 16, stroke: 'var(--ag-sky)', fill: 'rgba(46,134,201,0.2)' }}
+                  />
+                )}
+                {isSelf && !profile.verified && profile.verificationStatus === 'pending' && (
+                  <span className="t-xs c-warning">Verification Pending</span>
+                )}
+                {isSelf && !profile.verified && profile.verificationStatus === 'rejected' && (
+                  <span className="t-xs c-danger">Verification Needs Revision</span>
+                )}
+              </div>
             </div>
-            <div className="t-xs c-low">
-              {profile.handle} · {profile.tags.join(' · ')}
+
+            {profile.source === 'mock' && (
+              <div className="artist-profile-mock-metadata">
+                <div className="artist-profile-rating">
+                  <Icon name="star" style={{ width: 13, height: 13, stroke: 'none', fill: 'var(--ag-amber)' }} />
+                  <span className="t-sm fw-700">{profile.rating?.toFixed(1)}</span>
+                  <span className="t-xs c-low">{profile.reviewCount} reviews</span>
+                </div>
+                <span><strong>{profile.completed}</strong> <span className="t-xs c-low">Completed</span></span>
+                <span><strong>{profile.responseTime}</strong> <span className="t-xs c-low">Response</span></span>
+              </div>
+            )}
+
+            {profile.source === 'supabase' && reviewAverage !== null && (
+              <div className="artist-profile-rating" aria-label={`Rating ${reviewAverage.toFixed(1)} out of 5 from ${artistReviews.length} ${artistReviews.length === 1 ? 'review' : 'reviews'}`}>
+                <Icon name="star" style={{ width: 14, height: 14, stroke: 'none', fill: 'var(--ag-amber)' }} />
+                <span className="t-sm fw-700">{reviewAverage.toFixed(1)}</span>
+                <span className="t-xs c-low">· {artistReviews.length} {artistReviews.length === 1 ? 'review' : 'reviews'}</span>
+              </div>
+            )}
+
+            <p className="t-xs c-mid artist-profile-bio">{profile.bio}</p>
+
+            {profile.tags.length > 0 && (
+              <div className="artist-profile-tags">
+                {profile.tags.map((tag) => (
+                  <span className="chip" key={tag}>{tag}</span>
+                ))}
+              </div>
+            )}
+
+            <div className="artist-profile-actions">
+              {isViewingOwnProfile && (
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => navigate('/profile/edit')}>
+                  Edit Profile
+                </button>
+              )}
+              {profile.source === 'supabase' && !isViewingOwnProfile && realProfile && (
+                <button
+                  type="button"
+                  className="btn btn-primary artist-profile-message-button"
+                  onClick={() => void handleMessageArtist()}
+                  disabled={startingConversation || !user || realProfile.id === user.id}
+                >
+                  <Icon name="chat" style={{ width: 16, height: 16, stroke: '#fff' }} />
+                  {startingConversation ? 'Opening conversation…' : 'Message'}
+                </button>
+              )}
+              {messageError && <div className="t-xs c-danger artist-profile-message-error" role="alert">{messageError}</div>}
             </div>
           </div>
-          {isViewingOwnProfile && (
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => navigate('/profile/edit')}>
-              Edit
-            </button>
-          )}
-        </div>
-
-        {profile.source === 'mock' && <div className="row gap-14" style={{ margin: '16px 0' }}>
-          <div>
-            <div className="row gap-8">
-              <Icon name="star" style={{ width: 13, height: 13, stroke: 'none', fill: 'var(--ag-amber)' }} />
-              <span className="t-sm fw-700">{profile.rating?.toFixed(1)}</span>
-            </div>
-            <div className="t-xs c-low">{profile.reviewCount} reviews</div>
-          </div>
-          <div style={{ width: 1, height: 26, background: 'var(--ag-border-soft)' }} />
-          <div>
-            <div className="t-sm fw-700 mono">{profile.completed}</div>
-            <div className="t-xs c-low">Completed</div>
-          </div>
-          <div style={{ width: 1, height: 26, background: 'var(--ag-border-soft)' }} />
-          <div>
-            <div className="t-sm fw-700 mono">{profile.responseTime}</div>
-            <div className="t-xs c-low">Response</div>
-          </div>
-        </div>}
-
-        {profile.source === 'supabase' && reviewAverage !== null && (
-          <div className="row gap-8" style={{ margin: '16px 0' }} aria-label={`Rating ${reviewAverage.toFixed(1)} out of 5 from ${artistReviews.length} ${artistReviews.length === 1 ? 'review' : 'reviews'}`}>
-            <Icon name="star" style={{ width: 14, height: 14, stroke: 'none', fill: 'var(--ag-amber)' }} />
-            <span className="t-sm fw-700">{reviewAverage.toFixed(1)}</span>
-            <span className="t-xs c-low">· {artistReviews.length} {artistReviews.length === 1 ? 'review' : 'reviews'}</span>
-          </div>
-        )}
-
-        <p className="t-xs c-mid" style={{ lineHeight: 1.6, marginBottom: isSelf ? 12 : 18 }}>
-          {profile.bio}
-        </p>
-
-        {profile.source === 'supabase' && !isViewingOwnProfile && realProfile && (
-          <div className="artist-profile-actions">
-            <button
-              type="button"
-              className="btn btn-primary artist-profile-message-button"
-              onClick={() => void handleMessageArtist()}
-              disabled={startingConversation || !user || realProfile.id === user.id}
-            >
-              <Icon name="chat" style={{ width: 16, height: 16, stroke: '#fff' }} />
-              {startingConversation ? 'Opening conversation…' : 'Message'}
-            </button>
-            {messageError && <div className="t-xs c-danger artist-profile-message-error" role="alert">{messageError}</div>}
-          </div>
-        )}
-
-        {isSelf && profile.tags.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 18 }}>
-            {profile.tags.map((tag) => (
-              <span className="chip" key={tag} style={{ fontSize: 11 }}>
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
+        </section>
 
         {profile.source === 'mock' && <div className="row-between" style={{ marginBottom: 10 }}>
           <span className="section-title">Protected Portfolio</span>
@@ -915,15 +872,15 @@ export function ArtistProfilePage() {
                     const engagement = commissionPostEngagement[post.id];
                     const canRequest = Boolean(user?.role === 'client' && !isOwner && post.status === 'OPEN');
                     return (
-                      <article className="commission-post-card" key={post.id}>
+                      <article className="commission-post-card ag-liquid-glass-soft" key={post.id}>
                         <div className="commission-post-card-header">
                           <div className="commission-post-author">
-                            <div
+                            <ProfileAvatar
                               className="avatar avatar-md commission-post-avatar"
-                              style={profile.avatarDataUrl ? { backgroundImage: `url(${profile.avatarDataUrl})` } : undefined}
-                            >
-                              {!profile.avatarDataUrl && profile.initials}
-                            </div>
+                              imageUrl={profile.avatarDataUrl}
+                              initials={profile.initials}
+                              style={profile.avatarStyle}
+                            />
                             <div className="commission-post-author-copy">
                               <div className="t-sm fw-700 commission-post-author-name">{profile.name}</div>
                               <div className="t-xs c-low">{profile.handle} · Artist</div>
@@ -1037,7 +994,7 @@ export function ArtistProfilePage() {
           {!portfolioLoading && !portfolioError && realPortfolio.length === 0 && <div className="card t-sm c-mid">No artworks in portfolio yet.</div>}
           {!portfolioLoading && !portfolioError && realPortfolio.length > 0 && <div className="artist-protected-portfolio">
             {realPortfolio.map((artwork) => (
-              <article className="card artist-protected-portfolio-card" key={artwork.id} style={{ padding: 0, overflow: 'hidden' }}>
+              <article className="card artist-protected-portfolio-card ag-liquid-glass-soft" key={artwork.id} style={{ padding: 0, overflow: 'hidden' }}>
                 <div className="artist-protected-portfolio-image" style={{ background: 'var(--ag-surface-2)' }}>
                   {portfolioUrls[artwork.id] ? (
                     <ProtectedArtworkDisplay
@@ -1212,12 +1169,11 @@ export function ArtistProfilePage() {
                   {artistPostApplications.map((application) => (
                     <article className="commission-applicant-card" key={application.id}>
                       <div className="commission-post-author">
-                        <div
+                        <ProfileAvatar
                           className="avatar avatar-md commission-post-avatar"
-                          style={application.applicant_avatar_data_url ? { backgroundImage: `url(${application.applicant_avatar_data_url})` } : undefined}
-                        >
-                          {!application.applicant_avatar_data_url && application.applicant_name.slice(0, 1).toUpperCase()}
-                        </div>
+                          imageUrl={application.applicant_avatar_data_url}
+                          initials={application.applicant_name.slice(0, 1).toUpperCase()}
+                        />
                         <div className="commission-post-author-copy">
                           <div className="t-sm fw-700">{application.applicant_name}</div>
                           <div className="t-xs c-low">@{application.applicant_username} · Client</div>

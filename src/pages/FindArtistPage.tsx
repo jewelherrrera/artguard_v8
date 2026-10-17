@@ -6,9 +6,9 @@ import { Icon } from '../assets/icons';
 import { useAuth } from '../context/AuthContext';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { initialsFor, listArtistProfiles, searchProfiles, type PublicProfile } from '../lib/supabaseData';
-import { createServiceCommissionRequest, getCommissionById } from '../lib/supabaseRevisions';
-import { listActiveArtistCommissionServices, type ArtistCommissionService } from '../lib/supabaseArtistServices';
+import { createCommissionRequest, getCommissionById } from '../lib/supabaseRevisions';
 import { validateRequired } from '../utils/validators';
+import './FindArtistPage.css';
 
 /**
  * Real "Start a Commission" flow — only ever lists real registered
@@ -21,7 +21,6 @@ export function FindArtistPage() {
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const requestedArtistId = searchParams.get('artistId');
-  const requestedServiceId = searchParams.get('serviceId');
   const preselectionApplied = useRef(false);
 
   const [artists, setArtists] = useState<PublicProfile[]>([]);
@@ -30,10 +29,6 @@ export function FindArtistPage() {
   const [searching, setSearching] = useState(false);
 
   const [selected, setSelected] = useState<PublicProfile | null>(null);
-  const [services, setServices] = useState<Array<Pick<ArtistCommissionService, 'id' | 'artist_id' | 'name' | 'description' | 'price' | 'currency' | 'turnaround_days'>>>([]);
-  const [selectedService, setSelectedService] = useState<typeof services[number] | null>(null);
-  const [servicesLoading, setServicesLoading] = useState(false);
-  const [servicesError, setServicesError] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [titleError, setTitleError] = useState<string | undefined>();
@@ -47,26 +42,9 @@ export function FindArtistPage() {
     window.setTimeout(() => setFeedback((f) => (f?.text === text ? null : f)), 3200);
   };
 
-  const selectArtist = (artist: PublicProfile, preferredServiceId?: string) => {
+  const selectArtist = (artist: PublicProfile) => {
     setSelected(artist);
-    setSelectedService(null);
-    setServices([]);
-    setServicesError(false);
     setSubmittedRequest(null);
-    setServicesLoading(true);
-    void listActiveArtistCommissionServices(artist.id)
-      .then((rows) => {
-        setServices(rows);
-        if (preferredServiceId) {
-          const preferredService = rows.find((service) => service.id === preferredServiceId);
-          if (preferredService) setSelectedService(preferredService);
-        }
-      })
-      .catch(() => {
-        setServices([]);
-        setServicesError(true);
-      })
-      .finally(() => setServicesLoading(false));
   };
 
   useEffect(() => {
@@ -96,8 +74,8 @@ export function FindArtistPage() {
     const requestedArtist = artists.find((artist) => artist.id === requestedArtistId);
     if (!requestedArtist) return;
     preselectionApplied.current = true;
-    selectArtist(requestedArtist, requestedServiceId ?? undefined);
-  }, [artists, loading, requestedArtistId, requestedServiceId]);
+    selectArtist(requestedArtist);
+  }, [artists, loading, requestedArtistId]);
 
   useEffect(() => {
     if (!user) return;
@@ -124,7 +102,7 @@ export function FindArtistPage() {
   }, [searchTerm, user]);
 
   const handleConfirmStart = async () => {
-    if (!selected || !selectedService) return;
+    if (!selected) return;
     if (selected.accepting_commissions !== true) {
       showFeedback(selected.accepting_commissions === false
         ? 'This artist is no longer accepting new commissions.'
@@ -138,7 +116,7 @@ export function FindArtistPage() {
     if (nextTitleError || nextDescriptionError) return;
     setStarting(true);
     try {
-      const result = await createServiceCommissionRequest(selectedService.id, title, description);
+      const result = await createCommissionRequest(selected.id, title, description);
       const savedCommission = await getCommissionById(result.commissionId);
       setSubmittedRequest({
         id: result.commissionId,
@@ -155,9 +133,7 @@ export function FindArtistPage() {
       const message = err instanceof Error ? err.message.toLowerCase() : '';
       showFeedback(message.includes('artist_not_accepting_commissions')
         ? 'This artist is no longer accepting new commissions.'
-        : message.includes('service')
-          ? 'This service is no longer available.'
-          : 'Could not start this commission.', true);
+        : 'Could not start this commission.', true);
     } finally {
       setStarting(false);
     }
@@ -166,7 +142,7 @@ export function FindArtistPage() {
   return (
     <ScreenShell
       header={
-        <div className="px-hd row-between">
+        <div className="px-hd row-between commission-start-header">
           <div className="row gap-10">
             <IconButton icon="chevron-l" onClick={() => navigate(-1)} ariaLabel="Back" />
             <span className="h-title" style={{ fontSize: 19 }}>
@@ -216,39 +192,6 @@ export function FindArtistPage() {
               {selected.accepting_commissions == null && (
                 <div className="t-xs c-danger" role="status" style={{ marginBottom: 10 }}>
                   Availability unavailable. New requests are disabled.
-                </div>
-              )}
-              <div className="section-title" style={{ margin: '14px 0 10px' }}>Choose a Commission Service</div>
-              {servicesLoading && <div className="t-xs c-low" role="status">Loading commission services...</div>}
-              {!servicesLoading && servicesError && <div className="t-xs c-danger" role="alert">Could not load commission services.</div>}
-              {!servicesLoading && !servicesError && services.length === 0 && <div className="t-xs c-mid">No commission services available.</div>}
-              {!servicesLoading && !servicesError && services.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
-                  {services.map((service) => (
-                    <button
-                      key={service.id}
-                      type="button"
-                      className={`card tap-card${selectedService?.id === service.id ? ' service-option-selected' : ''}`}
-                      style={{ padding: '12px 14px', borderColor: selectedService?.id === service.id ? 'var(--ag-accent)' : undefined }}
-                      onClick={() => setSelectedService(service)}
-                    >
-                      <div className="row-between" style={{ gap: 10, alignItems: 'flex-start' }}>
-                        <div style={{ minWidth: 0, textAlign: 'left' }}>
-                          <div className="t-sm fw-700">{service.name}</div>
-                          {service.description && <div className="t-xs c-mid" style={{ marginTop: 3, lineHeight: 1.45 }}>{service.description}</div>}
-                        </div>
-                        <span className="t-xs fw-700" style={{ flexShrink: 0 }}>{service.currency} {service.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                      </div>
-                      <div className="t-xs c-low" style={{ marginTop: 7, textAlign: 'left' }}>{service.turnaround_days} day{service.turnaround_days === 1 ? '' : 's'} turnaround</div>
-                    </button>
-                  ))}
-                </div>
-              )}
-              {selectedService && (
-                <div className="card" style={{ marginBottom: 14, padding: '10px 12px', background: 'var(--ag-surface-2)' }}>
-                  <div className="t-xs c-low">Selected Service</div>
-                  <div className="t-sm fw-700" style={{ marginTop: 3 }}>{selectedService.name}</div>
-                  <div className="t-xs c-mid" style={{ marginTop: 3 }}>{selectedService.currency} {selectedService.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · {selectedService.turnaround_days} day{selectedService.turnaround_days === 1 ? '' : 's'}</div>
                 </div>
               )}
               <label className="field-label" htmlFor="commission-title">
@@ -308,9 +251,6 @@ export function FindArtistPage() {
                   disabled={starting}
                   onClick={() => {
                     setSelected(null);
-                    setSelectedService(null);
-                    setServices([]);
-                    setServicesError(false);
                     setTitle('');
                     setDescription('');
                     setTitleError(undefined);
@@ -324,7 +264,7 @@ export function FindArtistPage() {
                   type="button"
                   className="btn btn-primary"
                   style={{ flex: 1 }}
-                  disabled={starting || servicesLoading || !selectedService || selected.accepting_commissions !== true}
+                  disabled={starting || selected.accepting_commissions !== true}
                   onClick={() => void handleConfirmStart()}
                 >
                   {starting ? 'Sending…' : 'Send Commission Request'}

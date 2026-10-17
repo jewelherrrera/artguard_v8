@@ -46,12 +46,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  background: var(--ag-glass-bg);
-  border: 1px solid var(--ag-glass-border);
   border-radius: var(--ag-r-md);
-  box-shadow: var(--ag-shadow-card);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
 }
 
 .chat-thread-content,
@@ -291,9 +286,6 @@
   padding: 10px;
   border-radius: var(--ag-r-lg);
   z-index: 30;
-  background: var(--ag-surface);
-  border: 1px solid var(--ag-border-soft);
-  box-shadow: var(--ag-shadow-card);
 }
 
 .chat-attach-row {

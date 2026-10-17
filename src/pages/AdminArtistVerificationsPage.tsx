@@ -218,7 +218,7 @@ export function AdminArtistVerificationsPage() {
         {toast}
         {selectedPreview && (
           <div className="admin-verification-preview-backdrop" role="presentation" onClick={() => setSelectedPreview(null)}>
-            <section className="admin-verification-preview-modal" role="dialog" aria-modal="true" aria-label={selectedPreview.title} onClick={(event) => event.stopPropagation()}>
+            <section className="admin-verification-preview-modal ag-liquid-glass-strong" role="dialog" aria-modal="true" aria-label={selectedPreview.title} onClick={(event) => event.stopPropagation()}>
               <div className="row-between gap-10">
                 <span className="t-sm fw-700">{selectedPreview.title}</span>
                 <button type="button" className="link-sm" onClick={() => setSelectedPreview(null)}>Close</button>

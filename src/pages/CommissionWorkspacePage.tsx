@@ -846,7 +846,7 @@ export function CommissionWorkspacePage() {
           </div>
         }
       >
-        <section className="card workspace-summary-card" style={{ marginBottom: 16, padding: '14px 16px' }}>
+        <section className="card workspace-summary-card ag-liquid-glass-soft" style={{ marginBottom: 16, padding: '14px 16px' }}>
           <div className="row-between" style={{ marginBottom: 12 }}>
             <div style={{ minWidth: 0 }}>
               <div className="section-title">Commission Overview</div>
@@ -985,7 +985,7 @@ export function CommissionWorkspacePage() {
         </section>
 
         {showPaymentPanel && (
-          <section className="card workspace-payment-card" style={{ marginBottom: 16, padding: '14px 16px' }} aria-label="Commission payment">
+          <section className="card workspace-payment-card ag-liquid-glass-soft" style={{ marginBottom: 16, padding: '14px 16px' }} aria-label="Commission payment">
             <div className="section-title" style={{ marginBottom: 8 }}>Payment</div>
             {paymentLoading ? (
               <div className="t-xs c-low" role="status">Loading payment status…</div>
@@ -1124,7 +1124,7 @@ export function CommissionWorkspacePage() {
         )}
 
         {(realCommission.status === 'ACCEPTED' || realCommission.status === 'IN_PROGRESS' || realCommission.status === 'REVISION_REQUESTED') && (
-          <section className="card workspace-milestone-card" style={{ marginBottom: 16 }}>
+          <section className="card workspace-milestone-card ag-liquid-glass-soft" style={{ marginBottom: 16 }}>
             <div className="row-between" style={{ marginBottom: 12 }}>
               <span className="section-title">Milestone Progress</span>
               {progressUpdates[0] && <span className="badge badge-accent">{progressUpdates[0].progress_percent}%</span>}
@@ -1225,7 +1225,7 @@ export function CommissionWorkspacePage() {
           </section>
         )}
 
-        <section className="card workspace-escrow-card" aria-label="Escrow status">
+        <section className="card workspace-escrow-card ag-liquid-glass-soft" aria-label="Escrow status">
           <div className="row-between workspace-escrow-heading">
             <span className="section-title">Escrow Status</span>
             <span className={`badge ${escrowStatusClass}`}>{escrowStatus}</span>
@@ -1459,7 +1459,7 @@ export function CommissionWorkspacePage() {
     >
       <button
         type="button"
-        className="tap-card row-between card workspace-summary-card workspace-counterparty"
+        className="tap-card row-between card workspace-summary-card workspace-counterparty ag-liquid-glass-soft"
         style={{ marginBottom: 16, padding: '12px 16px' }}
         onClick={() => navigate('/chat')}
       >
@@ -1533,7 +1533,7 @@ export function CommissionWorkspacePage() {
         </div>
       </div>
 
-      <div className="card workspace-payment-card" style={{ marginBottom: 16 }}>
+      <div className="card workspace-payment-card ag-liquid-glass-soft" style={{ marginBottom: 16 }}>
         <div className="row-between" style={{ marginBottom: 10 }}>
           <span className="section-title">Escrow Status</span>
           <span className="badge badge-success">Secured</span>

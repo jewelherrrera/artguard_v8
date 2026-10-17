@@ -29,7 +29,7 @@ export function GetStartedPage() {
             <span className="get-started-brand-name">ArtGuard Hub</span>
           </header>
 
-          <section className="get-started-card" aria-labelledby="get-started-title">
+          <section className="get-started-card ag-liquid-glass-strong" aria-labelledby="get-started-title">
             <div className="get-started-card-shine" aria-hidden="true" />
             <div className="get-started-eyebrow">
               <span className="get-started-eyebrow-line" />

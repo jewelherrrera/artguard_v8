@@ -146,10 +146,8 @@
   overflow: auto;
   overscroll-behavior: contain;
   padding: 16px;
-  border: 1px solid var(--ag-border);
+  border: 1px solid var(--ag-glass-edge);
   border-radius: var(--ag-r-lg);
-  background: var(--ag-surface);
-  box-shadow: var(--ag-shadow-glow);
 }
 
 .protected-artwork-modal img {

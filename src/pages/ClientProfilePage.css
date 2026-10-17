@@ -1,3 +1,8 @@
+.profile-title-font {
+  font-family: var(--ion-font-family, 'Inter', sans-serif);
+  font-weight: 600;
+}
+
 .client-profile-request-heading {
   display: flex;
   align-items: center;

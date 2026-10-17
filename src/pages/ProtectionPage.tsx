@@ -479,10 +479,9 @@ function ProtectionPageContent() {
       </label>
       <button
         type="button"
-        className="tap-card card"
+        className="tap-card card ag-liquid-glass-soft"
         style={{
           border: '1.5px dashed var(--ag-border)',
-          background: 'var(--ag-surface-2)',
           textAlign: 'center',
           padding: '26px 16px',
           marginBottom: 18,
@@ -541,7 +540,7 @@ function ProtectionPageContent() {
       {!artworksLoading && !artworksError && artworks.length > 0 && (
         <div className="protected-artwork-grid">
           {artworks.map((artwork) => (
-            <article className="protected-artwork-card card" key={artwork.id}>
+            <article className="protected-artwork-card card ag-liquid-glass-soft" key={artwork.id}>
               <button
                 type="button"
                 className="protected-artwork-preview"
@@ -691,7 +690,7 @@ function ProtectionPageContent() {
       {previewError && <div className="card t-xs protection-artwork-error" role="alert">{previewError}</div>}
       {preview && (
         <div className="protected-artwork-modal-backdrop" role="presentation" onClick={() => setPreview(null)}>
-          <section className="protected-artwork-modal" role="dialog" aria-modal="true" aria-label={preview.artwork.title} onClick={(event) => event.stopPropagation()}>
+          <section className="protected-artwork-modal ag-liquid-glass-strong" role="dialog" aria-modal="true" aria-label={preview.artwork.title} onClick={(event) => event.stopPropagation()}>
             <div className="row-between gap-10" style={{ marginBottom: 12 }}>
               <span className="t-sm fw-700">{preview.artwork.title}</span>
               <button type="button" className="link-sm" onClick={() => setPreview(null)}>Close</button>
