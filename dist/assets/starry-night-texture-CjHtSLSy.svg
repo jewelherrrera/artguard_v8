@@ -11,19 +11,19 @@
       <stop offset="1" stop-color="#72ADFF" stop-opacity="0"/>
     </radialGradient>
   </defs>
-  <g stroke="#83B5FF" stroke-linecap="round">
-    <path d="M-85 255C45 135 163 118 303 181c101 45 147 133 278 134 118 1 174-93 294-89 122 5 194 97 317 66" stroke-opacity=".25" stroke-width="4"/>
-    <path d="M-62 283C83 174 174 158 290 211c112 52 154 131 286 132 132 1 184-84 300-79 105 5 187 79 304 61" stroke-opacity=".18" stroke-width="1.5"/>
-    <path d="M1280 468c-122-62-229-57-321 18-85 69-119 181-253 199-143 18-207-88-344-52-96 25-163 96-245 116" stroke-opacity=".2" stroke-width="3"/>
-    <path d="M-70 754c132-95 262-100 358-37 100 66 127 168 258 177 133 9 206-101 335-78 132 23 189 122 389 103" stroke-opacity=".22" stroke-width="3.5"/>
-    <path d="M-63 782c121-81 243-88 334-30 100 63 139 169 272 179 132 10 210-95 337-71 136 25 203 112 377 97" stroke-opacity=".15" stroke-width="1.4"/>
-    <path d="M103 1116c108-75 205-89 291-47 81 39 121 101 217 94 97-7 133-81 230-83 99-2 173 57 271 29" stroke-opacity=".16" stroke-width="2.5"/>
-    <path d="M1022-74c-67 92-81 180-44 262 37 83 112 106 117 204 6 100-72 154-50 254 22 102 100 133 100 237" stroke-opacity=".18" stroke-width="2.5"/>
+  <g stroke="#8EB7FF" stroke-linecap="round">
+    <path d="M-85 255C45 135 163 118 303 181c101 45 147 133 278 134 118 1 174-93 294-89 122 5 194 97 317 66" stroke-opacity=".1" stroke-width="2.1"/>
+    <path d="M-62 283C83 174 174 158 290 211c112 52 154 131 286 132 132 1 184-84 300-79 105 5 187 79 304 61" stroke-opacity=".08" stroke-width="1.2"/>
+    <path d="M1280 468c-122-62-229-57-321 18-85 69-119 181-253 199-143 18-207-88-344-52-96 25-163 96-245 116" stroke-opacity=".09" stroke-width="1.8"/>
+    <path d="M-70 754c132-95 262-100 358-37 100 66 127 168 258 177 133 9 206-101 335-78 132 23 189 122 389 103" stroke-opacity=".1" stroke-width="1.7"/>
+    <path d="M-63 782c121-81 243-88 334-30 100 63 139 169 272 179 132 10 210-95 337-71 136 25 203 112 377 97" stroke-opacity=".07" stroke-width="1.1"/>
+    <path d="M103 1116c108-75 205-89 291-47 81 39 121 101 217 94 97-7 133-81 230-83 99-2 173 57 271 29" stroke-opacity=".08" stroke-width="1.4"/>
+    <path d="M1022-74c-67 92-81 180-44 262 37 83 112 106 117 204 6 100-72 154-50 254 22 102 100 133 100 237" stroke-opacity=".08" stroke-width="1.4"/>
   </g>
   <g stroke="#F6C453" stroke-linecap="round">
-    <path d="M861 78c54 28 83 72 85 131 2 50-18 90-3 137" stroke-opacity=".17" stroke-width="1.5"/>
-    <path d="M81 513c41-29 86-37 136-23 44 12 72 43 116 44" stroke-opacity=".15" stroke-width="1.3"/>
-    <path d="M913 932c54-29 105-25 149 13 33 28 47 67 93 83" stroke-opacity=".14" stroke-width="1.5"/>
+    <path d="M861 78c54 28 83 72 85 131 2 50-18 90-3 137" stroke-opacity=".09" stroke-width="1.1"/>
+    <path d="M81 513c41-29 86-37 136-23 44 12 72 43 116 44" stroke-opacity=".07" stroke-width="0.9"/>
+    <path d="M913 932c54-29 105-25 149 13 33 28 47 67 93 83" stroke-opacity=".08" stroke-width="1.1"/>
   </g>
   <g fill="#D9EBFF" stroke="#D9EBFF" stroke-opacity=".4" stroke-width=".8">
     <circle cx="89" cy="93" r="1.5" fill-opacity=".52"/>

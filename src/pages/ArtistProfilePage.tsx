@@ -318,11 +318,11 @@ export function ArtistProfilePage() {
   }
 
   if (isRealSelf && realProfileLoading) {
-    return <ScreenShell header={<div className="px-hd row-between"><span className="h-title profile-title-font" style={{ fontSize: 19 }}>Profile</span></div>} footer={<BottomNav active="profile" />}><div className="card t-sm c-mid" style={{ textAlign: 'center' }}>Loading artist profile…</div></ScreenShell>;
+    return <ScreenShell header={<div className="px-hd row-between"><span className="h-title">My Profile</span><IconButton icon="dots" onClick={() => navigate('/profile/settings')} ariaLabel="Settings" /></div>} footer={<BottomNav active="profile" />}><div className="card t-sm c-mid" style={{ textAlign: 'center' }}>Loading artist profile…</div></ScreenShell>;
   }
 
   if (isRealSelf && (!realProfile || realProfileError)) {
-    return <ScreenShell header={<div className="px-hd row-between"><span className="h-title profile-title-font" style={{ fontSize: 19 }}>Profile</span></div>} footer={<BottomNav active="profile" />}><div className="card t-sm c-mid" style={{ textAlign: 'center' }}>{realProfileError ?? 'Artist profile not found.'}</div></ScreenShell>;
+    return <ScreenShell header={<div className="px-hd row-between"><span className="h-title">My Profile</span><IconButton icon="dots" onClick={() => navigate('/profile/settings')} ariaLabel="Settings" /></div>} footer={<BottomNav active="profile" />}><div className="card t-sm c-mid" style={{ textAlign: 'center' }}>{realProfileError ?? 'Artist profile not found.'}</div></ScreenShell>;
   }
 
   if (!isSelf && !publicArtist && (!realProfile || realProfileError)) {
@@ -665,24 +665,16 @@ export function ArtistProfilePage() {
     }
   };
 
-  const profileHeaderControls = (
+  const profileHeaderControls = !isSelf && (
     <div className="artist-profile-header-controls">
-      {!isSelf ? (
-        <IconButton icon="chevron-l" onClick={() => navigate(-1)} ariaLabel="Back" />
-      ) : (
-        <span />
-      )}
-      {isSelf ? (
-        <IconButton icon="dots" onClick={() => navigate('/profile/settings')} ariaLabel="Settings" />
-      ) : (
-        <OptionsMenu
-          ariaLabel="More options"
-          items={[
-            { label: 'Report artist', onClick: () => showToast(`${profile.name} reported (mock)`) },
-            { label: 'Block artist', onClick: () => showToast(`${profile.name} blocked (mock)`), danger: true },
-          ]}
-        />
-      )}
+      <IconButton icon="chevron-l" onClick={() => navigate(-1)} ariaLabel="Back" />
+      <OptionsMenu
+        ariaLabel="More options"
+        items={[
+          { label: 'Report artist', onClick: () => showToast(`${profile.name} reported (mock)`) },
+          { label: 'Block artist', onClick: () => showToast(`${profile.name} blocked (mock)`), danger: true },
+        ]}
+      />
     </div>
   );
 
@@ -709,6 +701,12 @@ export function ArtistProfilePage() {
   return (
     <ScreenShell
       padContent={false}
+      header={isSelf ? (
+        <div className="px-hd row-between">
+          <span className="h-title">My Profile</span>
+          <IconButton icon="dots" onClick={() => navigate('/profile/settings')} ariaLabel="Settings" />
+        </div>
+      ) : undefined}
       footer={
         isSelf ? (
           <BottomNav active="profile" />

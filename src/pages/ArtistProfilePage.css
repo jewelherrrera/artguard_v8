@@ -180,7 +180,16 @@
 
 @media (max-width: 767px) {
   .artist-profile-content {
-    padding: 8px 16px 24px;
+    padding: calc(env(safe-area-inset-top, 0px) + 18px) 16px 24px;
+  }
+
+  .artist-profile-header-controls {
+    min-height: 44px;
+  }
+
+  .artist-profile-header-controls .icon-btn {
+    width: 44px;
+    height: 44px;
   }
 
   .artist-profile-header {
@@ -215,6 +224,21 @@
 
   .artist-profile-tags {
     gap: 6px;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .artist-profile-content {
+    padding-top: 18px;
+  }
+
+  .artist-profile-header-controls {
+    min-height: 44px;
+  }
+
+  .artist-profile-header-controls .icon-btn {
+    width: 44px;
+    height: 44px;
   }
 }
 

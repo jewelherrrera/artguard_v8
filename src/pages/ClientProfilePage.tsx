@@ -567,7 +567,7 @@ export function ClientProfilePage() {
     <ScreenShell
       header={
         <div className="px-hd row-between">
-          <span className="h-title profile-title-font">My Profile</span>
+          <span className="h-title">My Profile</span>
           <IconButton icon="dots" onClick={() => navigate('/profile/settings')} ariaLabel="Settings" />
         </div>
       }
