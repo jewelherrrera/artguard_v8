@@ -88,6 +88,7 @@ export type PresenceStatus = 'online' | 'offline' | 'recent';
 
 export interface ChatMessage {
   id: string;
+  conversationId?: string;
   from: 'me' | 'them';
   kind: ChatMessageKind;
   createdAt?: string;

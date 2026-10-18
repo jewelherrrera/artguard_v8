@@ -145,7 +145,12 @@ export function ChatInboxPage() {
               <div className="t-sm c-mid chat-inbox-list-empty" role="status">
                 No conversations match that search.
               </div>
-            ) : null
+            ) : (
+              <div className="chat-inbox-desktop-empty chat-inbox-mobile-empty" role="status">
+                <Icon name="chat" style={{ width: 44, height: 44, stroke: 'var(--ag-text-low)' }} />
+                <p className="t-sm c-mid" style={{ marginTop: 14 }}>Select a conversation to start messaging</p>
+              </div>
+            )
           ) : (
             <div className="chat-list">
               {filtered.map((conversation) => (

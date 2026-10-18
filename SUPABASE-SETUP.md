@@ -212,6 +212,36 @@ The application never runs this migration automatically. Verify the listed
 prerequisites in the target project's SQL Editor and apply this migration once.
 Do not rerun the base schema or unrelated migrations to enable attachments.
 
+### Correcting per-user chat deletion and canonical threads
+
+The previously applied `supabase/chat-fresh-threads-after-deletion.sql`
+migration allowed a new conversation ID when either participant had deleted
+their inbox view. That behavior can create duplicate threads for one pair.
+After that migration and its prerequisites, the next required step is to
+review and apply
+`supabase/chat-canonical-per-user-reset-correction.sql` once in the Supabase
+SQL Editor. Do not rerun older migrations or the base schema.
+
+The corrective migration chooses the original (oldest) row as the canonical
+conversation for each duplicate direct-message pair. It moves existing message
+rows to that conversation without changing message IDs or payloads, keeps
+superseded conversation rows as aliases, and merges participant-specific
+`reset_at` boundaries independently. Attachment storage object paths remain
+unchanged; the migration updates the attachment read policy to resolve those
+paths through their superseded conversation alias. It restores a unique
+constraint for active pair threads and updates conversation resolution to
+reuse the canonical ID. A new message reopens only the recipient's inbox
+visibility (`hidden_at`); it does not clear that participant's `reset_at`
+history boundary. The existing `deleted_at` value is retained as legacy
+deletion metadata and is no longer used to create a new thread.
+
+This forward-only correction also restores the recipient-unhide trigger and
+ensures `conversation_participants` is in `supabase_realtime` with a policy
+allowing users to read their own participant rows. The application does not
+run this migration automatically. Review its reconciliation behavior and
+apply it only after the already-applied fresh-thread migration; do not claim
+the live database is corrected until it has been applied and tested.
+
 ### Persistent Discover likes and comments
 
 After all prerequisites for `supabase/artwork-publication.sql` have been applied,

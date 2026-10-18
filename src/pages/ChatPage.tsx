@@ -230,6 +230,10 @@ export function ChatPage() {
       if (cancelled || settled) return;
       settled = true;
       window.clearTimeout(timeoutId);
+      if (found && found.id !== conversationId) {
+        navigate(`/chat/${found.id}`, { replace: true });
+        return;
+      }
       setResolvedConversation(found);
       setConversationLoadState(found
         ? null
@@ -247,7 +251,7 @@ export function ChatPage() {
       cancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [conversationId, contextConversation, conversationLoadAttempt]);
+  }, [conversationId, contextConversation, conversationLoadAttempt, navigate]);
 
   // IMPORTANT: Ionic's router may keep inactive pages mounted. Do not mark a
   // conversation read merely because its component exists in the outlet. A
@@ -470,6 +474,9 @@ export function ChatPage() {
         showToast('Message failed to send. Please try again.');
         return;
       }
+      if (sent.conversationId && sent.conversationId !== conversation.id) {
+        navigate(`/chat/${sent.conversationId}`, { replace: true });
+      }
       setDraft('');
       setShowEmojiPicker(false);
     } finally {
@@ -533,6 +540,9 @@ export function ChatPage() {
       if (!sent) {
         showToast('The attachment was not sent. Please try again.');
         return;
+      }
+      if (sent.conversationId && sent.conversationId !== conversation.id) {
+        navigate(`/chat/${sent.conversationId}`, { replace: true });
       }
       setPendingAttachment(null);
       setUploadProgress(null);
@@ -606,6 +616,9 @@ export function ChatPage() {
       if (!sent) {
         showToast('This artwork could not be shared from the current account mode.');
         return;
+      }
+      if (sent.conversationId && sent.conversationId !== conversation.id) {
+        navigate(`/chat/${sent.conversationId}`, { replace: true });
       }
       setShareArtworkOpen(false);
       setSelectedArtworkId(undefined);

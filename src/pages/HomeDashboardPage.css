@@ -19,21 +19,19 @@
   display: grid;
   grid-template-columns: minmax(0, 2.05fr) minmax(220px, 0.95fr);
   gap: 20px;
-  align-items: stretch;
-}
-
-.dashboard-lower-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 2.05fr) minmax(220px, 0.95fr);
-  gap: 20px;
   align-items: start;
 }
 
+.home-dashboard-main-column,
 .home-summary-sidebar {
-  display: grid;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
   gap: 16px;
   min-width: 0;
+}
+
+.home-dashboard-main-column {
+  gap: 24px;
 }
 
 .app-content-inner.home-dashboard-content {
@@ -548,6 +546,32 @@
   gap: 14px;
 }
 
+@media (min-width: 768px) {
+  .home-revenue-card {
+    align-self: start;
+    height: 170px;
+    padding: 16px 20px;
+  }
+
+  .home-revenue-card .mono {
+    margin-top: 4px;
+  }
+
+  .home-revenue-subtext {
+    margin-top: 2px;
+  }
+
+  .home-revenue-chart {
+    height: 48px;
+    margin-top: 8px;
+  }
+
+  .home-activity-list {
+    max-height: 280px;
+    overflow: hidden;
+  }
+}
+
 .home-activity-row {
   align-items: flex-start;
 }
@@ -757,7 +781,7 @@
   }
 
   .dashboard-summary-row,
-  .dashboard-lower-grid,
+  .home-dashboard-main-column,
   .home-summary-sidebar {
     display: contents;
   }
@@ -793,8 +817,7 @@
     padding-right: 16px;
   }
 
-  .dashboard-summary-row,
-  .dashboard-lower-grid {
+  .dashboard-summary-row {
     grid-template-columns: 1fr;
     gap: 16px;
   }

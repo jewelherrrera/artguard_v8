@@ -115,6 +115,7 @@ export function relativeTimeLabel(iso?: string | null): string {
 function mapMessage(row: DbMessage, currentUserId: string): ChatMessage {
   return {
     id: row.id,
+    conversationId: row.conversation_id,
     from: row.sender_id === currentUserId ? 'me' : 'them',
     kind: row.kind,
     createdAt: row.created_at,
@@ -282,6 +283,16 @@ export async function createOrFindConversation(_currentUserId: string, otherUser
   return String(data);
 }
 
+export async function resolveConversationForSend(conversationId: string): Promise<string> {
+  if (!supabase) throw new Error('Supabase is not configured.');
+  const { data, error } = await supabase.rpc('resolve_conversation_for_send', {
+    p_conversation_id: conversationId,
+  });
+  if (error) throw error;
+  if (typeof data !== 'string') throw new Error('The conversation could not be resolved for sending.');
+  return data;
+}
+
 export async function setMyConversationMuted(conversationId: string, muted: boolean): Promise<void> {
   if (!supabase) throw new Error('Supabase is not configured.');
   const { data, error } = await supabase.rpc('set_my_conversation_muted', {
@@ -361,16 +372,20 @@ export async function loadConversations(
 
   const { data: memberships, error: membershipsError } = await supabase
     .from('conversation_participants')
-    .select('conversation_id,reset_at')
+    .select('conversation_id,reset_at,conversations!inner(superseded_by)')
     .eq('user_id', currentUserId)
     .is('hidden_at', null);
 
   if (membershipsError) throw membershipsError;
 
-  const conversationIds = (memberships ?? []).map((row) => row.conversation_id);
+  const canonicalMemberships = (memberships ?? []).filter((row) => {
+    const conversation = row.conversations as { superseded_by?: string | null } | null;
+    return !conversation?.superseded_by;
+  });
+  const conversationIds = canonicalMemberships.map((row) => row.conversation_id);
   if (!conversationIds.length) return [];
   const resetAtByConversation = new Map(
-    (memberships ?? []).map((row) => [row.conversation_id, row.reset_at as string | null]),
+    canonicalMemberships.map((row) => [row.conversation_id, row.reset_at as string | null]),
   );
 
   const { data: preferenceRows, error: preferencesError } = await supabase
@@ -466,25 +481,7 @@ export async function loadConversations(
     })
     .filter(Boolean) as LoadedConversation[];
 
-  const byCounterparty = new Map<string, LoadedConversation>();
-  for (const conversation of loaded) {
-    const otherUserId = (conversation as Conversation & { otherUserId: string }).otherUserId;
-    const existing = byCounterparty.get(otherUserId);
-    if (!existing) {
-      byCounterparty.set(otherUserId, conversation);
-      continue;
-    }
-    const messagesById = new Map(existing.messages.map((message) => [message.id, message]));
-    for (const message of conversation.messages) messagesById.set(message.id, message);
-    const messages = Array.from(messagesById.values());
-    byCounterparty.set(otherUserId, {
-      ...existing,
-      id: existing.id < conversation.id ? existing.id : conversation.id,
-      messages,
-      unreadCount: messages.filter((message) => message.from === 'them' && message.status !== 'read').length,
-    } as LoadedConversation);
-  }
-  return Array.from(byCounterparty.values());
+  return loaded;
 }
 
 export async function loadHiddenConversationState(currentUserId: string): Promise<{
@@ -495,14 +492,18 @@ export async function loadHiddenConversationState(currentUserId: string): Promis
   if (!supabase) return { conversationIds: [], unreadCount: 0, resetAtByConversation: {} };
   const { data: memberships, error: membershipsError } = await supabase
     .from('conversation_participants')
-    .select('conversation_id,reset_at')
+    .select('conversation_id,reset_at,conversations!inner(superseded_by)')
     .eq('user_id', currentUserId)
     .not('hidden_at', 'is', null);
   if (membershipsError) throw membershipsError;
 
-  const conversationIds = Array.from(new Set((memberships ?? []).map((row) => row.conversation_id)));
+  const canonicalMemberships = (memberships ?? []).filter((row) => {
+    const conversation = row.conversations as { superseded_by?: string | null } | null;
+    return !conversation?.superseded_by;
+  });
+  const conversationIds = Array.from(new Set(canonicalMemberships.map((row) => row.conversation_id)));
   const resetAtByConversation = Object.fromEntries(
-    (memberships ?? []).map((row) => [row.conversation_id, (row.reset_at as string | null | undefined) ?? null]),
+    canonicalMemberships.map((row) => [row.conversation_id, (row.reset_at as string | null | undefined) ?? null]),
   );
   if (conversationIds.length === 0) return { conversationIds, unreadCount: 0, resetAtByConversation };
 

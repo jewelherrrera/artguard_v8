@@ -27,6 +27,7 @@ import {
   markConversationRead,
   markMessageDelivered,
   relativeTimeLabel,
+  resolveConversationForSend,
   resetMyConversation,
   searchProfiles,
   setMyChatBlocked,
@@ -114,6 +115,7 @@ type BroadcastReactionPayload = {
 function mapBroadcastMessage(row: DbMessage, currentUserId: string): ChatMessage {
   return {
     id: row.id,
+    conversationId: row.conversation_id,
     from: row.sender_id === currentUserId ? 'me' : 'them',
     kind: row.kind,
     createdAt: row.created_at,
@@ -197,9 +199,11 @@ function mergeConversationSnapshots(
 ): Conversation[] {
   const currentById = new Map(current.map((conversation) => [conversation.id, conversation]));
   const loadedIds = new Set(loaded.map((conversation) => conversation.id));
+  const loadedOtherUserIds = new Set(loaded.map((conversation) => conversation.otherUserId));
   const pending = current.filter((conversation) =>
     !loadedIds.has(conversation.id)
     && !hiddenIds.has(conversation.id)
+    && !loadedOtherUserIds.has((conversation as Conversation & { otherUserId?: string }).otherUserId ?? '')
     && (conversation.messages.length === 0 || Boolean((conversation as Conversation & { otherUserId?: string }).otherUserId))
   ).map((conversation) => {
     const resetAt = resetAtByConversation.get(conversation.id);
@@ -439,25 +443,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     const senderName = resolvedSender?.name ?? 'New message';
     const message = mapBroadcastMessage(row, userId);
     if (!isAfterResetBoundary(message, resetAtByConversationRef.current.get(row.conversation_id))) return;
-    if (hiddenConversationIdsRef.current.has(row.conversation_id)) {
-      try {
-        const reopenedId = await createOrFindConversation(userId, row.sender_id);
-        if (activeUserIdRef.current !== userId || reopenedId !== row.conversation_id) return;
-        const nextHiddenIds = new Set(hiddenConversationIdsRef.current);
-        nextHiddenIds.delete(row.conversation_id);
-        hiddenConversationIdsRef.current = nextHiddenIds;
-        setHiddenConversationIds(nextHiddenIds);
-      } catch (error) {
-        console.error('ArtGuard: unable to reopen conversation for incoming message', error);
-        return;
-      }
-    }
+    if (hiddenConversationIdsRef.current.has(row.conversation_id)) return;
 
     setConversations((prev) => {
       if (!isAfterResetBoundary(message, resetAtByConversationRef.current.get(row.conversation_id))) return prev;
       const existing = prev.find((conversation) => conversation.id === row.conversation_id);
       if (existing?.messages.some((item) => item.id === row.id)) return prev;
       if (!existing) {
+        if (prev.some((conversation) =>
+          (conversation as Conversation & { otherUserId?: string }).otherUserId === row.sender_id,
+        )) return prev;
         const initials = senderName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('');
         const presence = onlineUserIdsRef.current.has(row.sender_id) || heartbeatSaysOnline(resolvedSender?.last_seen_at) ? 'online' : 'recent';
         const newConversation: Conversation & { otherUserId: string } = {
@@ -535,6 +530,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       .on('broadcast', { event: 'new_message' }, (payload) => {
         const data = payload.payload as BroadcastMessagePayload | undefined;
         if (!data?.message?.id || data.message.sender_id !== data.sender.id) return;
+        if (!conversationsRef.current.some((conversation) => conversation.id === data.message.conversation_id)) {
+          void refreshConversations();
+        }
         void handleIncomingMessage(data.message, data.sender);
       })
       .on('broadcast', { event: 'messages_read' }, (payload) => {
@@ -578,6 +576,25 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, () => {
         void refreshConversations();
+      })
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'conversation_participants',
+        filter: `user_id=eq.${userId}`,
+      }, () => {
+        if (activeUserIdRef.current !== userId) return;
+        void refreshConversations();
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'conversation_participants',
+        filter: `user_id=eq.${userId}`,
+      }, (payload) => {
+        if (activeUserIdRef.current !== userId) return;
+        const participant = payload.new as { hidden_at?: string | null };
+        if (participant.hidden_at === null) void refreshConversations();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversation_notification_preferences', filter: `user_id=eq.${userId}` }, (payload) => {
         if (activeUserIdRef.current !== userId) return;
@@ -648,8 +665,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     saved: ChatMessage,
     senderId: string,
     currentConversations: Conversation[],
+    sourceConversationId: string,
   ) => {
-    const current = currentConversations.find((c) => c.id === conversationId);
+    const current = currentConversations.find((c) => c.id === conversationId)
+      ?? currentConversations.find((c) => c.id === sourceConversationId);
     const otherUserId = current?.otherUserId;
     if (!otherUserId) return;
 
@@ -730,12 +749,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
     if (isSupabaseConfigured && supabase && user) {
       try {
-        const saved = await insertMessage(conversationId, user.id, crypto.randomUUID(), { kind: 'text', text: trimmed });
+        const targetConversationId = await resolveConversationForSend(conversationId);
+        const saved = await insertMessage(targetConversationId, user.id, crypto.randomUUID(), { kind: 'text', text: trimmed });
+        const savedConversationId = saved.conversationId ?? targetConversationId;
         // IMPORTANT: append the server response immediately. Do not wait for
         // Realtime, otherwise the sender sees an apparently broken composer.
-        appendLocal(conversationId, saved);
+        appendLocal(savedConversationId, saved);
 
-        await broadcastPersistedMessage(conversationId, saved, user.id, conversations);
+        await refreshConversations();
+        await broadcastPersistedMessage(savedConversationId, saved, user.id, conversations, conversationId);
         return saved;
       } catch (error) {
         console.error('ArtGuard: send message failed', error);
@@ -748,7 +770,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     appendLocal(conversationId, message);
     runAutoReply(conversationId, id, getAutoReply(trimmed));
     return message;
-  }, [appendLocal, broadcastPersistedMessage, conversations, runAutoReply, user]);
+  }, [appendLocal, broadcastPersistedMessage, conversations, refreshConversations, runAutoReply, user]);
 
   const sendAttachmentMessage = useCallback(async (
     conversationId: string,
@@ -763,10 +785,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
     if (isSupabaseConfigured && supabase && user) {
       const clientMessageId = crypto.randomUUID();
-      const storagePath = createChatAttachmentStoragePath(conversationId, user.id, clientMessageId, file);
+      let storagePath = '';
       try {
+        const targetConversationId = await resolveConversationForSend(conversationId);
+        storagePath = createChatAttachmentStoragePath(targetConversationId, user.id, clientMessageId, file);
         await uploadChatAttachment(storagePath, file, onProgress);
-        const saved = await insertMessage(conversationId, user.id, clientMessageId, {
+        const saved = await insertMessage(targetConversationId, user.id, clientMessageId, {
           kind,
           imageName: kind === 'image' ? fileName : undefined,
           fileName,
@@ -776,14 +800,18 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           attachmentMimeType: file.type,
           attachmentSizeBytes: file.size,
         });
-        appendLocal(conversationId, saved);
-        await broadcastPersistedMessage(conversationId, saved, user.id, conversations);
+        const savedConversationId = saved.conversationId ?? targetConversationId;
+        appendLocal(savedConversationId, saved);
+        await refreshConversations();
+        await broadcastPersistedMessage(savedConversationId, saved, user.id, conversations, conversationId);
         return saved;
       } catch (error) {
-        try {
-          await removeChatAttachment(storagePath);
-        } catch (cleanupError) {
-          console.error('ArtGuard: failed to remove orphaned chat attachment', cleanupError);
+        if (storagePath) {
+          try {
+            await removeChatAttachment(storagePath);
+          } catch (cleanupError) {
+            console.error('ArtGuard: failed to remove orphaned chat attachment', cleanupError);
+          }
         }
         throw error;
       }
@@ -811,21 +839,24 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     appendLocal(conversationId, message);
     runAutoReply(conversationId, id, getAttachmentAutoReply());
     return message;
-  }, [appendLocal, broadcastPersistedMessage, conversations, runAutoReply, user]);
+  }, [appendLocal, broadcastPersistedMessage, conversations, refreshConversations, runAutoReply, user]);
 
   const sendArtworkMessage = useCallback(async (
     conversationId: string,
     artworkId: string,
   ): Promise<ChatMessage | null> => {
     if (!isSupabaseConfigured || !supabase || !user) return null;
-    const saved = await insertMessage(conversationId, user.id, crypto.randomUUID(), {
+    const targetConversationId = await resolveConversationForSend(conversationId);
+    const saved = await insertMessage(targetConversationId, user.id, crypto.randomUUID(), {
       kind: 'artwork',
       artworkId,
     });
-    appendLocal(conversationId, saved);
-    await broadcastPersistedMessage(conversationId, saved, user.id, conversations);
+    const savedConversationId = saved.conversationId ?? targetConversationId;
+    appendLocal(savedConversationId, saved);
+    await refreshConversations();
+    await broadcastPersistedMessage(savedConversationId, saved, user.id, conversations, conversationId);
     return saved;
-  }, [appendLocal, broadcastPersistedMessage, conversations, user]);
+  }, [appendLocal, broadcastPersistedMessage, conversations, refreshConversations, user]);
 
   const toggleReaction = useCallback(async (conversationId: string, messageId: string, emoji: string) => {
     const conversation = conversations.find((c) => c.id === conversationId);
@@ -1001,8 +1032,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
         setConversations((prev) => {
           const existing = prev.find((c) => c.id === id);
-          if (existing) return prev.map((c) => (c.id === id ? { ...existing, ...optimistic, messages: existing.messages } : c));
-          return [optimistic, ...prev];
+          const withoutPair = prev.filter((c) => c.id === id || c.otherUserId !== other.id);
+          if (existing) return [{ ...existing, ...optimistic, messages: existing.messages }, ...withoutPair.filter((c) => c.id !== id)];
+          return [optimistic, ...withoutPair];
         });
       }
 
@@ -1029,6 +1061,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     if (!isSupabaseConfigured || !supabase || !userId) return null;
 
     try {
+      const { data: requestedConversation, error: requestedConversationError } = await supabase
+        .from('conversations')
+        .select('id,superseded_by')
+        .eq('id', id)
+        .maybeSingle();
+      if (requestedConversationError) throw requestedConversationError;
+      if (!requestedConversation) return null;
+      const canonicalId = requestedConversation.superseded_by ?? requestedConversation.id;
       const loaded = await loadConversations(userId, onlineUserIdsRef.current);
       if (activeUserIdRef.current !== userId) return null;
       for (const conversation of loaded) {
@@ -1041,7 +1081,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         resetAtByConversationRef.current,
       );
       setConversations(merged);
-      return merged.find((conversation) => conversation.id === id) ?? null;
+      return merged.find((conversation) => conversation.id === canonicalId) ?? null;
     } catch (error) {
       console.error('ArtGuard: unable to load requested conversation', error);
       return null;

@@ -437,6 +437,7 @@ export function HomeDashboardPage() {
     >
       <div className="home-dashboard-shell">
         <div className="dashboard-summary-row">
+          <div className="home-dashboard-main-column">
           {isSupabaseConfigured ? (
             <button
               type="button"
@@ -514,75 +515,6 @@ export function HomeDashboardPage() {
             </button>
           )}
 
-          <div className="home-summary-sidebar">
-            <aside className="home-quick-stats" aria-label="Quick stats">
-              <div className="home-quick-stats-header">Quick Stats</div>
-              <div className="home-quick-stats-grid">
-                {quickStats.map((stat) => (
-                  <button
-                    key={stat.label}
-                    type="button"
-                    className={`home-stat home-stat-${stat.tone}`}
-                    aria-label={`${stat.value} ${stat.label.toLowerCase()} commissions`}
-                    aria-pressed={commissionTab === stat.key}
-                    onClick={() => {
-                      setCommissionTab(stat.key);
-                      commissionSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }}
-                  >
-                    <div className="home-stat-label">{stat.label}</div>
-                    <div className="home-stat-value" aria-hidden="true">{stat.value}</div>
-                  </button>
-                ))}
-              </div>
-            </aside>
-
-            <aside className="card home-activity-card ag-liquid-glass-soft">
-              <div className="row-between home-activity-heading">
-                <span className="section-title">Recent Activity</span>
-                <button
-                  type="button"
-                  className="home-refresh-button"
-                  aria-label="Refresh dashboard"
-                  title="Refresh dashboard"
-                  disabled={loadingCommissions || loadingPaidCommissionPayments || loadingNotifications || refreshingDashboard}
-                  onClick={() => void refreshDashboard()}
-                >
-                  <Icon name="refresh" />
-                </button>
-              </div>
-              <div className="home-activity-list">
-                {isSupabaseConfigured ? (
-                  loadingNotifications ? (
-                    <div className="t-xs c-low" role="status">Loading recent activity…</div>
-                  ) : notificationsError ? (
-                    <div className="home-activity-error" role="alert">
-                      <div className="t-xs c-low">Recent activity unavailable: {notificationsError}</div>
-                      <button type="button" className="link-sm" onClick={() => void refreshNotifications()}>Retry</button>
-                    </div>
-                  ) : recentCommissionActivity.length === 0 ? (
-                    <div className="t-xs c-low home-empty-activity">No recent commission activity.</div>
-                  ) : recentCommissionActivity.map((notification) => (
-                    <div className="row gap-10 home-activity-row" key={notification.id}>
-                      <div className="home-activity-icon">
-                        <Icon name="bell" style={{ width: 14, height: 14, stroke: 'var(--ag-accent)' }} />
-                      </div>
-                      <div className="home-activity-copy">
-                        <div className="t-xs c-hi fw-600">{notification.title}</div>
-                        <div className="t-xs c-mid">{notification.message}</div>
-                        <div className="t-xs c-low">{relativeNotificationTime(notification.created_at)}</div>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="t-xs c-low home-empty-activity">No recent activity data is available yet.</div>
-                )}
-              </div>
-            </aside>
-          </div>
-        </div>
-
-        <div className="dashboard-lower-grid">
           <section className="home-commissions-panel" ref={commissionSectionRef}>
             {isSupabaseConfigured && (
               <>
@@ -775,7 +707,74 @@ export function HomeDashboardPage() {
               </>
             )}
           </section>
+          </div>
 
+          <div className="home-summary-sidebar">
+            <aside className="home-quick-stats" aria-label="Quick stats">
+              <div className="home-quick-stats-header">Quick Stats</div>
+              <div className="home-quick-stats-grid">
+                {quickStats.map((stat) => (
+                  <button
+                    key={stat.label}
+                    type="button"
+                    className={`home-stat home-stat-${stat.tone}`}
+                    aria-label={`${stat.value} ${stat.label.toLowerCase()} commissions`}
+                    aria-pressed={commissionTab === stat.key}
+                    onClick={() => {
+                      setCommissionTab(stat.key);
+                      commissionSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }}
+                  >
+                    <div className="home-stat-label">{stat.label}</div>
+                    <div className="home-stat-value" aria-hidden="true">{stat.value}</div>
+                  </button>
+                ))}
+              </div>
+            </aside>
+
+            <aside className="card home-activity-card ag-liquid-glass-soft">
+              <div className="row-between home-activity-heading">
+                <span className="section-title">Recent Activity</span>
+                <button
+                  type="button"
+                  className="home-refresh-button"
+                  aria-label="Refresh dashboard"
+                  title="Refresh dashboard"
+                  disabled={loadingCommissions || loadingPaidCommissionPayments || loadingNotifications || refreshingDashboard}
+                  onClick={() => void refreshDashboard()}
+                >
+                  <Icon name="refresh" />
+                </button>
+              </div>
+              <div className="home-activity-list">
+                {isSupabaseConfigured ? (
+                  loadingNotifications ? (
+                    <div className="t-xs c-low" role="status">Loading recent activity…</div>
+                  ) : notificationsError ? (
+                    <div className="home-activity-error" role="alert">
+                      <div className="t-xs c-low">Recent activity unavailable: {notificationsError}</div>
+                      <button type="button" className="link-sm" onClick={() => void refreshNotifications()}>Retry</button>
+                    </div>
+                  ) : recentCommissionActivity.length === 0 ? (
+                    <div className="t-xs c-low home-empty-activity">No recent commission activity.</div>
+                  ) : recentCommissionActivity.slice(0, 4).map((notification) => (
+                    <div className="row gap-10 home-activity-row" key={notification.id}>
+                      <div className="home-activity-icon">
+                        <Icon name="bell" style={{ width: 14, height: 14, stroke: 'var(--ag-accent)' }} />
+                      </div>
+                      <div className="home-activity-copy">
+                        <div className="t-xs c-hi fw-600">{notification.title}</div>
+                        <div className="t-xs c-mid">{notification.message}</div>
+                        <div className="t-xs c-low">{relativeNotificationTime(notification.created_at)}</div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="t-xs c-low home-empty-activity">No recent activity data is available yet.</div>
+                )}
+              </div>
+            </aside>
+          </div>
         </div>
       </div>
       {toast}

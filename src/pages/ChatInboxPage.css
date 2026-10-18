@@ -86,6 +86,17 @@
   text-align: center;
 }
 
+.chat-inbox-mobile-empty {
+  min-height: 0;
+  padding: 36px 14px 20px;
+}
+
+@media (max-width: 1099px) {
+  .chat-inbox-layout > .chat-inbox-desktop-empty {
+    display: none;
+  }
+}
+
 @media (min-width: 1100px) {
   .chat-inbox-layout {
     flex-direction: row;
@@ -102,6 +113,10 @@
     flex: 1 1 0;
     height: 100%;
     min-height: 0;
+  }
+
+  .chat-inbox-mobile-empty {
+    display: none;
   }
 }
 
