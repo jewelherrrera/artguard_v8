@@ -1,0 +1,73 @@
+Attached Element Context from Integrated Browser
+
+Element: svg.home-revenue-graph-svg
+
+URL: http://localhost:5173/home
+
+HTML Path: div#root > ion-app.ios.ion-page.hydrated > ion-router-outlet#routerOutlet-2.hydrated > div.ion-page.app-page.can-go-back > div.app-shell > div.app-frame > ion-content.app-content.ios.content-ltr.hydrated > div.app-content-inner.home-dashboard-content > div.dash-grid > div.dash-main > button.tap-card.card.home-revenue-card > div.home-revenue-chart > svg.home-revenue-graph-svg
+
+Outer HTML:
+```html
+<svg viewBox="0 0 260 36" class="home-revenue-graph-svg" aria-hidden="true"><path d="M 0 22 C 34 18, 54 25, 78 17 S 138 12, 162 20 S 214 8, 260 10"></path></svg>
+```
+
+Dimensions:
+- top: 189px
+- left: 35px
+- width: 509px
+- height: 54px
+
+CSS:
+```css
+* { box-sizing:border-box;-webkit-tap-highlight-color:rgba(0,0,0,0);-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none }
+* { box-sizing: border-box; }
+.home-revenue-graph-svg { display: block;
+  width: 100%;
+  height: 100%; }
+
+/* Pseudo-elements */
+::selection { background: var(--ag-secondary);
+  color: #fff; }
+
+/* Inherited */
+button { font-family:inherit; font-style:inherit; font-variant:inherit; line-height:1; text-transform:none; cursor:pointer }
+button { font-family: inherit; cursor: pointer }
+.tap-card { text-align: left; font: inherit; color: inherit }
+.home-revenue-card { text-align: left }
+.inner-scroll { color: var(--color) }
+:host { font-family: var(--ion-font-family, inherit) }
+body { color:var(--ion-text-color) }
+html { font-family:var(--ion-font-family) }
+
+/* Resolved values */
+-webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+box-sizing: border-box;
+color: rgb(245, 241, 230);
+cursor: pointer;
+display: block;
+font-family: Inter, sans-serif;
+font-feature-settings: normal;
+font-kerning: auto;
+font-size: 16px;
+font-size-adjust: none;
+font-stretch: 100%;
+font-style: normal;
+font-weight: 400;
+height: 54.4px;
+letter-spacing: normal /*UA*/;
+line-height: normal;
+overflow-clip-margin: content-box /*UA*/;
+overflow-x: hidden /*UA*/;
+overflow-y: hidden /*UA*/;
+text-align: left;
+text-indent: 0px /*UA*/;
+text-transform: none;
+width: 508.8px;
+word-spacing: 0px /*UA*/;
+
+/* CSS variables */
+--ag-secondary: #1d5c8c;
+--color: #f5f1e6;
+--ion-text-color: #f5f1e6;
+--ion-font-family: 'Inter', sans-serif;
+```

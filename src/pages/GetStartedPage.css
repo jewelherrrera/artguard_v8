@@ -3,6 +3,11 @@
 }
 
 .get-started-page {
+  --ag-glass-strong-bg: rgba(13, 24, 45, 0.74);
+  --ag-glass-edge: rgba(225, 237, 255, 0.38);
+  --ag-glass-reflection: rgba(190, 216, 255, 0.14);
+  --ag-glass-inner-highlight: rgba(218, 232, 255, 0.1);
+  --ag-glass-floating-shadow: 0 22px 58px rgba(1, 6, 18, 0.48), 0 2px 10px rgba(0, 0, 0, 0.24);
   min-height: 100dvh;
   position: relative;
   overflow: hidden;
