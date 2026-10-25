@@ -12,12 +12,42 @@ import {
   recordAuthDiagnosticNavigation,
 } from '../utils/authInteractionDiagnostics';
 
+const GOOGLE_NAME_ONBOARDING_KEY = 'artguard.googleNameOnboarding';
+
+function googleNameOnboardingValue(userId?: string): string | undefined {
+  if (!userId) return undefined;
+  try {
+    const stored: unknown = JSON.parse(sessionStorage.getItem(GOOGLE_NAME_ONBOARDING_KEY) ?? 'null');
+    if (
+      typeof stored === 'object'
+      && stored !== null
+      && 'userId' in stored
+      && stored.userId === userId
+      && 'name' in stored
+      && typeof stored.name === 'string'
+    ) {
+      return stored.name;
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+function clearGoogleNameOnboardingValue() {
+  try {
+    sessionStorage.removeItem(GOOGLE_NAME_ONBOARDING_KEY);
+  } catch {
+    // Session storage may be unavailable in restrictive browser modes.
+  }
+}
+
 /** Step 1 of post-sign-up onboarding: confirm/edit display name. */
 export function OnboardingNamePage() {
   const navigate = useNavigate();
   const { user, updateProfile } = useAuth();
 
-  const [name, setName] = useState(user?.name ?? '');
+  const [name, setName] = useState(() => googleNameOnboardingValue(user?.id) ?? user?.name ?? '');
   const [error, setError] = useState<string | undefined>();
   const [submitting, setSubmitting] = useState(false);
 
@@ -25,8 +55,7 @@ export function OnboardingNamePage() {
     recordAuthDiagnosticDestinationReached('/onboarding/name');
   }, []);
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
+  const saveAndContinue = async () => {
     const validation = validateRequired(name, 'Name');
     setError(validation);
     if (validation) return;
@@ -38,9 +67,15 @@ export function OnboardingNamePage() {
       setError(result.error ?? 'Could not save your profile. Please try again.');
       return;
     }
+    clearGoogleNameOnboardingValue();
     logAuthInteractionDiagnostic('onboarding.step.completed', { destination: '/onboarding/interests' });
     recordAuthDiagnosticNavigation('/onboarding/interests', 'react-router-useNavigate');
     navigate('/onboarding/interests');
+  };
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    void saveAndContinue();
   };
 
   return (
@@ -62,6 +97,14 @@ export function OnboardingNamePage() {
         />
         <AuthButton type="submit" loading={submitting} style={{ marginTop: 8 }}>
           Continue
+        </AuthButton>
+        <AuthButton
+          variant="secondary"
+          onClick={() => void saveAndContinue()}
+          loading={submitting}
+          style={{ marginTop: 10 }}
+        >
+          Skip
         </AuthButton>
       </form>
     </AuthShell>

@@ -18,6 +18,7 @@ type ProfileUpdatePatch = Partial<Omit<AuthUser, 'isPro'>>;
 type AuthOperation = 'login' | 'signup' | 'oauth';
 type AuthenticatedDestination = '/home' | '/onboarding/name' | '/onboarding/interests';
 const GOOGLE_SIGNUP_INTENT_KEY = 'artguard.googleSignupIntent';
+const GOOGLE_NAME_ONBOARDING_KEY = 'artguard.googleNameOnboarding';
 
 export interface GoogleSignupIntent {
   role: UserRole;
@@ -27,6 +28,30 @@ export interface GoogleSignupIntent {
 function clearGoogleSignupIntent() {
   try {
     sessionStorage.removeItem(GOOGLE_SIGNUP_INTENT_KEY);
+  } catch {
+    // Session storage may be unavailable in restrictive browser modes.
+  }
+}
+
+function googleDisplayName(authUser: SupabaseAuthUser): string | undefined {
+  for (const key of ['full_name', 'name']) {
+    const value = authUser.user_metadata?.[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+function storeGoogleNameOnboarding(userId: string, name: string) {
+  try {
+    sessionStorage.setItem(GOOGLE_NAME_ONBOARDING_KEY, JSON.stringify({ userId, name }));
+  } catch {
+    console.warn('ArtGuard: could not preserve Google name onboarding state for refresh.');
+  }
+}
+
+function clearGoogleNameOnboarding() {
+  try {
+    sessionStorage.removeItem(GOOGLE_NAME_ONBOARDING_KEY);
   } catch {
     // Session storage may be unavailable in restrictive browser modes.
   }
@@ -509,6 +534,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } else {
       clearGoogleSignupIntent();
+      clearGoogleNameOnboarding();
     }
 
     try {
@@ -565,6 +591,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const isNewGoogleAccount = intent !== undefined
         && Number.isFinite(createdAt)
         && createdAt >= intent.startedAt;
+      const metadataName = googleDisplayName(authUser);
       const metadataRole = authUser.user_metadata?.role;
       const role: UserRole = isNewGoogleAccount
         ? intent.role
@@ -579,10 +606,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!profile) {
         return { success: false, error: 'Unable to set up your profile. Please try again.' };
       }
+      if (isNewGoogleAccount && profile.role !== role) {
+        const { data: roleUpdatedProfile, error: roleUpdateError } = await supabase
+          .from('profiles')
+          .update({ role })
+          .eq('id', authUser.id)
+          .select('*')
+          .maybeSingle();
+        if (roleUpdateError || !roleUpdatedProfile) {
+          if (roleUpdateError) logAuthRequestFailure('oauth', roleUpdateError);
+          return { success: false, error: 'Unable to finish setting up your account. Please try again.' };
+        }
+        Object.assign(profile, roleUpdatedProfile);
+      }
 
       const authenticatedUser: AuthUser = {
         ...authUserFromMetadata(authUser),
-        name: profile.name,
+        name: isNewGoogleAccount ? metadataName ?? '' : profile.name,
         username: profile.username,
         role: profile.role,
         bio: profile.bio ?? undefined,
@@ -602,10 +642,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       persistSession(authenticatedUser);
       setInitializing(false);
       clearGoogleSignupIntent();
+      if (isNewGoogleAccount) storeGoogleNameOnboarding(authUser.id, metadataName ?? '');
+      else clearGoogleNameOnboarding();
       const hasDisplayName = Boolean(profile.name?.trim());
       const hasSavedInterests = Boolean(profile.interests?.length);
       const onboardingComplete = Boolean(profile.onboarded || hasSavedInterests);
-      const destination: AuthenticatedDestination = !hasDisplayName || !existingProfile
+      const destination: AuthenticatedDestination = isNewGoogleAccount || !hasDisplayName || !existingProfile
         ? '/onboarding/name'
         : onboardingComplete
           ? '/home'
