@@ -41,6 +41,13 @@ interface GoogleIdentityLoginButtonProps {
 const GOOGLE_IDENTITY_SCRIPT = 'https://accounts.google.com/gsi/client';
 let googleIdentityScriptPromise: Promise<void> | undefined;
 
+async function googleClientIdFingerprint(clientId: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(clientId));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0'))
+    .join('')
+    .slice(0, 12);
+}
+
 function loadGoogleIdentityScript(): Promise<void> {
   if (window.google?.accounts?.id) return Promise.resolve();
   if (googleIdentityScriptPromise) return googleIdentityScriptPromise;
@@ -85,6 +92,12 @@ export function GoogleIdentityLoginButton({
       onErrorRef.current('Google sign-in is not configured. Please try again later.');
       return;
     }
+
+    void googleClientIdFingerprint(clientId)
+      .then((fingerprint) => console.info('ArtGuard Google Login client configuration.', {
+        clientIdFingerprint: fingerprint,
+      }))
+      .catch(() => console.warn('ArtGuard Google Login client fingerprint unavailable.'));
 
     let active = true;
     void loadGoogleIdentityScript().then(() => {

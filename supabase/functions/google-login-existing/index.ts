@@ -59,6 +59,36 @@ function credentialFailureStage(error: unknown): string {
   return 'jwt_invalid';
 }
 
+async function fingerprint(value: string): Promise<string> {
+  try {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+    return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0'))
+      .join('')
+      .slice(0, 12);
+  } catch {
+    return 'unavailable';
+  }
+}
+
+async function unverifiedAudienceFingerprints(token: string): Promise<string[]> {
+  try {
+    const payloadSegment = token.split('.')[1];
+    if (!payloadSegment) return [];
+    const base64 = payloadSegment.replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, '='))) as {
+      aud?: unknown;
+    };
+    const audiences = typeof payload.aud === 'string'
+      ? [payload.aud]
+      : Array.isArray(payload.aud)
+        ? payload.aud.filter((audience): audience is string => typeof audience === 'string')
+        : [];
+    return Promise.all(audiences.map(fingerprint));
+  } catch {
+    return [];
+  }
+}
+
 function findGoogleIdentity(user: {
   identities?: Array<{
     id?: string;
@@ -160,7 +190,17 @@ Deno.serve(async (request: Request) => {
       }));
     } catch (error) {
       const stage = credentialFailureStage(error);
-      console.warn('google-login-existing: credential rejected.', { stage });
+      const expectedAudienceFingerprint = await fingerprint(googleClientId);
+      const tokenAudienceFingerprints = stage === 'audience_mismatch'
+        ? await unverifiedAudienceFingerprints(credential)
+        : [];
+      const diagnosticAudienceMatch = tokenAudienceFingerprints.includes(expectedAudienceFingerprint);
+      console.warn('google-login-existing: credential rejected.', {
+        stage,
+        expectedAudienceFingerprint,
+        tokenAudienceFingerprints,
+        diagnosticAudienceMatch,
+      });
       return jsonResponse({ error: 'Invalid Google credential.', code: stage }, 401, origin);
     }
 
