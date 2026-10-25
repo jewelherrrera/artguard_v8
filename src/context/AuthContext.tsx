@@ -111,6 +111,19 @@ function getAuthErrorMetadata(error: unknown): AuthErrorMetadata {
   };
 }
 
+function safeAuthErrorMessage(error: unknown): string | undefined {
+  if (typeof error !== 'object' || error === null || !('message' in error) || typeof error.message !== 'string') {
+    return undefined;
+  }
+  return error.message
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[redacted-email]')
+    .replace(/\b[0-9a-f]{8}-[0-9a-f-]{27,}\b/gi, '[redacted-id]')
+    .replace(/\bBearer\s+\S+/gi, 'Bearer [redacted]')
+    .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, '[redacted-token]')
+    .slice(0, 240);
+}
+
 function logAuthRequestFailure(operation: AuthOperation, error: unknown) {
   const { code, status } = getAuthErrorMetadata(error);
   console.warn('ArtGuard: authentication request failed.', {
@@ -580,6 +593,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch {
         return { success: false, error: 'Unable to start Google sign-in. Please enable session storage and try again.' };
       }
+    } else {
+      try {
+        const stored: unknown = JSON.parse(sessionStorage.getItem(GOOGLE_SIGNUP_INTENT_KEY) ?? 'null');
+        const hasBoundPendingSignup = typeof stored === 'object'
+          && stored !== null
+          && 'userId' in stored
+          && typeof stored.userId === 'string';
+        if (!hasBoundPendingSignup) clearGoogleSignupIntent();
+      } catch {
+        clearGoogleSignupIntent();
+      }
     }
 
     try {
@@ -631,6 +655,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         && createdAt >= intent.startedAt;
       const isNewGoogleAccount = isBoundSignupIntent || canBindSignupIntent;
       const signupStep = isNewGoogleAccount ? intent?.step ?? 'name' : undefined;
+      if (intent && !isNewGoogleAccount) {
+        clearGoogleSignupIntent();
+        clearGoogleNameOnboarding();
+      }
       if (canBindSignupIntent && intent) {
         intent.userId = authUser.id;
         intent.step = 'name';
@@ -673,28 +701,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const isCompletedProfile = Boolean(profile.onboarded || profile.interests?.length);
       const isIncompleteGoogleSignup = isNewGoogleAccount && !isCompletedProfile;
       if (isIncompleteGoogleSignup && profile.role !== role) {
-        const { error: roleUpdateError } = await supabase
-          .from('profiles')
-          .update({ role })
-          .eq('id', authUser.id);
-        if (roleUpdateError) {
-          const { code, status } = getAuthErrorMetadata(roleUpdateError);
+        let roleUpdateError: { code?: string; status?: number; message?: string } | null = null;
+        try {
+          const result = await supabase
+            .from('profiles')
+            .update({ role })
+            .eq('id', authUser.id);
+          roleUpdateError = result.error;
+        } catch (error) {
+          const { code, status } = getAuthErrorMetadata(error);
           console.warn('ArtGuard: Google signup role update failed.', {
             code: code ?? 'unknown',
             status: status ?? null,
+            message: safeAuthErrorMessage(error),
           });
           return { success: false, error: 'Unable to save your selected account type. Please try again.' };
         }
-        try {
-          const savedProfile = await getMyProfile(authUser.id);
-          if (!savedProfile || savedProfile.role !== role) {
-            console.warn('ArtGuard: Google signup role update was not confirmed.');
-            return { success: false, error: 'Unable to verify your selected account type. Please try again.' };
+        if (roleUpdateError) {
+          let persistedProfile = null;
+          try {
+            persistedProfile = await getMyProfile(authUser.id);
+          } catch (verificationError) {
+            const { code, status } = getAuthErrorMetadata(verificationError);
+            console.warn('ArtGuard: Google signup role verification failed after update error.', {
+              code: code ?? 'unknown',
+              status: status ?? null,
+              message: safeAuthErrorMessage(verificationError),
+            });
           }
-          profile = savedProfile;
-        } catch (error) {
-          logAuthRequestFailure('oauth', error);
-          return { success: false, error: 'Unable to verify your profile update. Check your connection and try again.' };
+          if (persistedProfile?.role === role) {
+            profile = persistedProfile;
+          } else {
+            const { code, status } = getAuthErrorMetadata(roleUpdateError);
+            console.warn('ArtGuard: Google signup role update failed.', {
+              code: code ?? 'unknown',
+              status: status ?? null,
+              message: safeAuthErrorMessage(roleUpdateError),
+            });
+            return { success: false, error: 'Unable to save your selected account type. Please try again.' };
+          }
+        }
+        if (!roleUpdateError) {
+          try {
+            const savedProfile = await getMyProfile(authUser.id);
+            if (!savedProfile || savedProfile.role !== role) {
+              console.warn('ArtGuard: Google signup role update was not confirmed.');
+              return { success: false, error: 'Unable to verify your selected account type. Please try again.' };
+            }
+            profile = savedProfile;
+          } catch (error) {
+            logAuthRequestFailure('oauth', error);
+            return { success: false, error: 'Unable to verify your profile update. Check your connection and try again.' };
+          }
         }
       }
 
