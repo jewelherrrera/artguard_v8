@@ -9,22 +9,22 @@ const features = [
   {
     icon: 'shield',
     title: 'Protect and Present Your Artwork',
-    description: 'Keep original uploads private and choose whether processed previews appear in your portfolio or discovery. Preview options can add visible ownership marks or visual effects and suppress right-click or drag actions; they cannot prevent every copy, screenshot, or scrape.',
+    description: 'Manage original uploads and portfolio previews. Optional visual protections may discourage casual copying, but cannot prevent every copy or scrape.',
   },
   {
     icon: 'compass',
     title: 'Find Artists and Request Commissions',
-    description: 'Explore artist profiles and portfolios, then use available commission request flows to connect around a project. Artist verification is an application review, not a guarantee of identity or transaction safety.',
+    description: 'Explore portfolios and connect through commission requests. Verification does not guarantee identity or transaction safety.',
   },
   {
     icon: 'chat',
     title: 'Keep Commission Conversations Organized',
-    description: 'Message directly, share artwork and attachments, and keep project conversations together. Chat blocking is available, but messages are not a scam-detection service.',
+    description: 'Message directly and share artwork or attachments. Blocking is available, but chat is not scam detection.',
   },
   {
     icon: 'check-circle',
     title: 'Manage Commission Progress',
-    description: 'Use the commission workspace to follow progress, submit and review milestones, share deliverables, and record approvals as the project moves forward.',
+    description: 'Track milestones, share deliverables, and review project approvals.',
   },
 ] as const;
 
@@ -72,11 +72,9 @@ export function AboutPage() {
             <h1 id="about-title">Your Art Deserves Protection.</h1>
             <p className="about-tagline">Protecting creativity. Supporting safer commissions.</p>
             <p className="about-introduction">
-              ArtGuard Hub is a digital art platform built around helping artists present their creative work and
-              navigate commissions with greater confidence. In a digital world where artwork can be reused without
-              permission and commission scams are a concern, ArtGuard Hub brings artist profiles, artwork sharing,
-              direct communication, and commission management together in one place. Its available preview safeguards
-              can add deterrents, but cannot guarantee that artwork will not be copied or scraped.
+              ArtGuard Hub helps digital artists present their work and navigate commissions with greater confidence.
+              Private originals, portfolio previews, direct communication, and project workflows bring practical tools
+              together, but cannot prevent every form of copying or misuse.
             </p>
           </div>
         </section>
@@ -87,10 +85,8 @@ export function AboutPage() {
             <h2 id="about-why-title">Why ArtGuard Hub Exists</h2>
           </div>
           <p>
-            Digital artists face concerns including AI scraping and artwork copied, redistributed, or used without
-            permission. Online commission requests can also involve impersonation or dishonest interactions, while
-            unclear requirements, communication, and progress can make projects harder to navigate. These are challenges
-            ArtGuard Hub aims to help artists manage—not risks the app can eliminate.
+            Digital artists face AI scraping, unauthorized artwork reuse, impersonation, and commission scams. ArtGuard
+            Hub helps artists navigate these risks through tools for presenting artwork and managing commissions.
           </p>
         </section>
 
@@ -126,9 +122,9 @@ export function AboutPage() {
             <h2 id="about-mission-title">Our Mission</h2>
           </div>
           <p>
-            Our mission is to help digital artists present their work with greater confidence and navigate commissions
-            through clearer communication and more organized project workflows. We aim to support a creative community
-            that respects artists&apos; work and encourages responsible collaboration between artists and clients.
+            We aim to help digital artists present their work with greater confidence and manage commissions through
+            clearer communication and organized workflows—while encouraging respect for creative ownership and
+            responsible collaboration.
           </p>
         </section>
 
