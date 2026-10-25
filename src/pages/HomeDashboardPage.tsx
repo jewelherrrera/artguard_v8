@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useIonViewDidEnter } from '@ionic/react';
+import { useIonViewDidEnter, useIonViewWillLeave } from '@ionic/react';
 import { useNavigate } from 'react-router-dom';
 import { ScreenShell } from '../components/ui/ScreenShell';
 import { BottomNav } from '../components/ui/BottomNav';
@@ -15,6 +15,10 @@ import { ProgressBar } from '../components/ui/ProgressBar';
 import { useMockToast } from '../components/ui/MockToast';
 import { useNotifications } from '../context/NotificationContext';
 import type { NotificationRecord } from '../lib/notifications';
+import {
+  logAuthInteractionDiagnostic,
+  recordAuthDiagnosticDestinationReached,
+} from '../utils/authInteractionDiagnostics';
 import './HomeDashboardPage.css';
 
 function relativeNotificationTime(value: string): string {
@@ -113,6 +117,12 @@ export function HomeDashboardPage() {
   const dashboardHasLoadedCommissions = useRef(false);
   const lastCommissionNotificationSignature = useRef<{ userId: string; signature: string } | null>(null);
 
+  useEffect(() => {
+    recordAuthDiagnosticDestinationReached('/home');
+    logAuthInteractionDiagnostic('home.mounted', { destination: '/home' });
+    return () => logAuthInteractionDiagnostic('home.unmounted', { destination: '/home' });
+  }, []);
+
   const pendingCommissions = useMemo(() => myCommissions.filter((commission) => commission.status === 'REQUESTED'
     && (user?.role === 'artist' ? !commission.isClient : commission.isClient)), [myCommissions, user?.role]);
   const activeCommissions = useMemo(() => myCommissions.filter((commission) => ACTIVE_COMMISSION_STATUSES.has(commission.status)), [myCommissions]);
@@ -178,7 +188,8 @@ export function HomeDashboardPage() {
     };
   }, [refreshCommissions, user]);
 
-  useIonViewDidEnter(() => {
+  const logHomeViewDidEnter = useCallback(() => {
+    logAuthInteractionDiagnostic('home.ionic-view.did-enter', { destination: '/home' });
     if (!isSupabaseConfigured || !user?.id || !dashboardHasLoadedCommissions.current) return;
     void refreshCommissions().catch((error: unknown) => {
       console.error('ArtGuard: unable to refresh commissions when returning to dashboard', error);
@@ -186,7 +197,14 @@ export function HomeDashboardPage() {
     void refreshNotifications().catch((error: unknown) => {
       console.error('ArtGuard: unable to refresh activity when returning to dashboard', error);
     });
-  });
+  }, [refreshCommissions, refreshNotifications, user?.id]);
+
+  const logHomeViewWillLeave = useCallback(() => {
+    logAuthInteractionDiagnostic('home.ionic-view.will-leave', { destination: '/home' });
+  }, []);
+
+  useIonViewDidEnter(logHomeViewDidEnter);
+  useIonViewWillLeave(logHomeViewWillLeave);
 
   const commissionNotificationSignature = useMemo(() => notifications
     .filter((notification) => notification.notification_type === 'commission')

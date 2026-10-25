@@ -7,6 +7,10 @@ import { AuthButton } from '../components/auth/AuthButton';
 import { Icon } from '../assets/icons';
 import { useAuth } from '../context/AuthContext';
 import { validateEmailField, validateRequired } from '../utils/validators';
+import {
+  logAuthInteractionDiagnostic,
+  recordAuthDiagnosticNavigation,
+} from '../utils/authInteractionDiagnostics';
 
 interface FormErrors {
   email?: string;
@@ -38,13 +42,23 @@ export function LoginPage() {
     if (!validate()) return;
 
     setSubmitting(true);
-    const result = await login(email, password);
+    logAuthInteractionDiagnostic('login.started', { destination: '/home' });
+    let result: Awaited<ReturnType<typeof login>>;
+    try {
+      result = await login(email, password);
+    } catch (error) {
+      logAuthInteractionDiagnostic('login.failed', { success: false });
+      throw error;
+    }
     setSubmitting(false);
 
     if (!result.success) {
+      logAuthInteractionDiagnostic('login.failed', { success: false });
       setFormError(result.error ?? 'Something went wrong. Please try again.');
       return;
     }
+    logAuthInteractionDiagnostic('login.completed', { success: true });
+    recordAuthDiagnosticNavigation('/home', 'ionic-useIonRouter-root-replace');
     ionRouter.push('/home', 'root', 'replace');
   };
 

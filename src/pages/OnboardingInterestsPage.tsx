@@ -1,10 +1,15 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthShell } from '../components/auth/AuthShell';
 import { AuthButton } from '../components/auth/AuthButton';
 import { Icon } from '../assets/icons';
 import { useAuth } from '../context/AuthContext';
 import { INTEREST_OPTIONS } from '../data/mockData';
+import {
+  logAuthInteractionDiagnostic,
+  recordAuthDiagnosticDestinationReached,
+  recordAuthDiagnosticNavigation,
+} from '../utils/authInteractionDiagnostics';
 
 /** Step 2 of post-sign-up onboarding: pick interests, then land on the Dashboard. */
 export function OnboardingInterestsPage() {
@@ -13,6 +18,10 @@ export function OnboardingInterestsPage() {
   const [selected, setSelected] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | undefined>();
+
+  useEffect(() => {
+    recordAuthDiagnosticDestinationReached('/onboarding/interests');
+  }, []);
 
   const toggle = (interest: string) => {
     setSelected((prev) => (prev.includes(interest) ? prev.filter((i) => i !== interest) : [...prev, interest]));
@@ -27,6 +36,8 @@ export function OnboardingInterestsPage() {
       setError(result.error ?? 'Could not save your interests. Please try again.');
       return;
     }
+    logAuthInteractionDiagnostic('onboarding.completed', { destination: '/home' });
+    recordAuthDiagnosticNavigation('/home', 'react-router-useNavigate');
     navigate('/home', { replace: true });
   };
 

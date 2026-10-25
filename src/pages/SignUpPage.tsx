@@ -16,6 +16,10 @@ import {
   validatePasswordField,
   validateRequired,
 } from '../utils/validators';
+import {
+  logAuthInteractionDiagnostic,
+  recordAuthDiagnosticNavigation,
+} from '../utils/authInteractionDiagnostics';
 import './SignUpPage.css';
 
 interface FormErrors {
@@ -64,13 +68,23 @@ export function SignUpPage() {
     if (!validate()) return;
 
     setSubmitting(true);
-    const result = await signUp(name, email, password, role, birthday);
+    logAuthInteractionDiagnostic('signup.started', { destination: '/onboarding/name' });
+    let result: Awaited<ReturnType<typeof signUp>>;
+    try {
+      result = await signUp(name, email, password, role, birthday);
+    } catch (error) {
+      logAuthInteractionDiagnostic('signup.failed', { success: false });
+      throw error;
+    }
     setSubmitting(false);
 
     if (!result.success) {
+      logAuthInteractionDiagnostic('signup.failed', { success: false });
       setFormError(result.error ?? 'Something went wrong. Please try again.');
       return;
     }
+    logAuthInteractionDiagnostic('signup.completed', { success: true });
+    recordAuthDiagnosticNavigation('/onboarding/name', 'react-router-useNavigate');
     navigate('/onboarding/name', { replace: true });
   };
 

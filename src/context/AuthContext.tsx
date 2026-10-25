@@ -4,6 +4,11 @@ import type { AuthResult, AuthUser, MockAccount, UserRole } from '../types/auth'
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { getMyProfile, ensureMyProfile, usernameFromEmail } from '../lib/supabaseData';
 import { validatePasswordField } from '../utils/validators';
+import {
+  installAuthInteractionDiagnostics,
+  logAuthInteractionDiagnostic,
+  updateAuthInteractionDiagnosticState,
+} from '../utils/authInteractionDiagnostics';
 
 const ACCOUNTS_KEY = 'artguard.mockAccounts';
 const SESSION_KEY = 'artguard.session';
@@ -172,18 +177,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const authStateRevision = useRef(0);
 
   useEffect(() => {
+    updateAuthInteractionDiagnosticState({
+      initializing,
+      hasUser: Boolean(user),
+      isAuthenticated: Boolean(user),
+      supabaseConfigured: isSupabaseConfigured,
+    });
+  }, [initializing, user]);
+
+  useEffect(() => installAuthInteractionDiagnostics(), []);
+
+  useEffect(() => {
     let active = true;
+    logAuthInteractionDiagnostic('auth.initialization.started', {
+      initializing: true,
+      hasUser: false,
+      isAuthenticated: false,
+      supabaseConfigured: isSupabaseConfigured,
+    });
     if (!isSupabaseConfigured || !supabase) {
+      let hasUser = false;
       try {
         const raw = localStorage.getItem(SESSION_KEY);
-        if (raw) setUser(JSON.parse(raw) as AuthUser);
+        if (raw) {
+          setUser(JSON.parse(raw) as AuthUser);
+          hasUser = true;
+        }
       } finally {
         setInitializing(false);
+        logAuthInteractionDiagnostic('auth.initialization.completed', {
+          initializing: false,
+          hasUser,
+          isAuthenticated: hasUser,
+          supabaseConfigured: false,
+        });
       }
       return;
     }
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      logAuthInteractionDiagnostic('auth.state.changed', {
+        eventType: event,
+        hasUser: Boolean(session?.user),
+        initializing,
+        isAuthenticated: Boolean(session?.user),
+        supabaseConfigured: true,
+      });
       if (event === 'TOKEN_REFRESHED') return;
       const revision = ++authStateRevision.current;
       if (!session?.user) {
@@ -191,25 +230,66 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setPasswordRecoverySession(false);
         }
         setUser(null);
-        if (event === 'INITIAL_SESSION') setInitializing(false);
+        if (event === 'INITIAL_SESSION') {
+          setInitializing(false);
+          logAuthInteractionDiagnostic('auth.initialization.completed', {
+            eventType: event,
+            initializing: false,
+            hasUser: false,
+            isAuthenticated: false,
+            supabaseConfigured: true,
+          });
+        }
         return;
       }
       if (event === 'PASSWORD_RECOVERY') {
         setPasswordRecoverySession(true);
         setInitializing(false);
+        logAuthInteractionDiagnostic('auth.initialization.completed', {
+          eventType: event,
+          initializing: false,
+          hasUser: true,
+          isAuthenticated: true,
+          supabaseConfigured: true,
+        });
       } else if (event === 'SIGNED_IN') {
         setPasswordRecoverySession(false);
       }
       void publicUserFromSession(session.user).then((next) => {
         if (!active || revision !== authStateRevision.current) return;
         setUser(next);
-        if (event === 'INITIAL_SESSION') setInitializing(false);
+        if (event === 'INITIAL_SESSION') {
+          setInitializing(false);
+          logAuthInteractionDiagnostic('auth.initialization.completed', {
+            eventType: event,
+            initializing: false,
+            hasUser: true,
+            isAuthenticated: true,
+            supabaseConfigured: true,
+          });
+        }
         void refreshProfileForUser(session.user.id, next).then((refreshed) => {
           if (active && revision === authStateRevision.current) setUser(refreshed);
         });
       }).catch((error) => {
         if (active && revision === authStateRevision.current) {
-          if (event === 'INITIAL_SESSION') setInitializing(false);
+          if (event === 'INITIAL_SESSION') {
+            setInitializing(false);
+            logAuthInteractionDiagnostic('auth.initialization.failed', {
+              eventType: event,
+              initializing: false,
+              hasUser: true,
+              isAuthenticated: true,
+              supabaseConfigured: true,
+            });
+          } else {
+            logAuthInteractionDiagnostic('auth.state.hydration-failed', {
+              eventType: event,
+              hasUser: true,
+              isAuthenticated: true,
+              supabaseConfigured: true,
+            });
+          }
           console.error('ArtGuard: auth state update failed', error);
         }
       });

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthShell } from '../components/auth/AuthShell';
@@ -6,6 +6,11 @@ import { AuthInput } from '../components/auth/AuthInput';
 import { AuthButton } from '../components/auth/AuthButton';
 import { useAuth } from '../context/AuthContext';
 import { validateRequired } from '../utils/validators';
+import {
+  logAuthInteractionDiagnostic,
+  recordAuthDiagnosticDestinationReached,
+  recordAuthDiagnosticNavigation,
+} from '../utils/authInteractionDiagnostics';
 
 /** Step 1 of post-sign-up onboarding: confirm/edit display name. */
 export function OnboardingNamePage() {
@@ -15,6 +20,10 @@ export function OnboardingNamePage() {
   const [name, setName] = useState(user?.name ?? '');
   const [error, setError] = useState<string | undefined>();
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    recordAuthDiagnosticDestinationReached('/onboarding/name');
+  }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -29,6 +38,8 @@ export function OnboardingNamePage() {
       setError(result.error ?? 'Could not save your profile. Please try again.');
       return;
     }
+    logAuthInteractionDiagnostic('onboarding.step.completed', { destination: '/onboarding/interests' });
+    recordAuthDiagnosticNavigation('/onboarding/interests', 'react-router-useNavigate');
     navigate('/onboarding/interests');
   };
 
