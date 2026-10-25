@@ -63,7 +63,7 @@ function withCallbackTimeout<T>(operation: Promise<T>): Promise<T> {
 export function AuthCallbackPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { completeGoogleSignIn } = useAuth();
+  const { completeGoogleSignIn, completeExistingGoogleEmailLogin } = useAuth();
   const [error, setError] = useState<string>();
   const [processing, setProcessing] = useState(true);
   const [retryable, setRetryable] = useState(false);
@@ -74,13 +74,18 @@ export function AuthCallbackPage() {
     const callbackParams = new URLSearchParams(
       `${location.search.slice(1)}&${location.hash.slice(1)}`,
     );
+    const isExistingGoogleEmailLogin = callbackParams.get('flow') === 'existing-google-login';
     const providerError = callbackParams.get('error_code') ?? callbackParams.get('error');
     if (providerError) {
       handledAttempt.current = attempt;
       const cancelled = providerError === 'access_denied' || providerError === 'user_cancelled';
       setError(cancelled
-        ? 'Google sign-in was cancelled or declined. You can try again.'
-        : 'Google sign-in could not be completed. Please try again.');
+        ? isExistingGoogleEmailLogin
+          ? 'Email sign-in was cancelled. Please request a new sign-in link.'
+          : 'Google sign-in was cancelled or declined. You can try again.'
+        : isExistingGoogleEmailLogin
+          ? 'This email sign-in link could not be completed. Please request a new one.'
+          : 'Google sign-in could not be completed. Please try again.');
       setRetryable(false);
       setProcessing(false);
       return;
@@ -92,16 +97,25 @@ export function AuthCallbackPage() {
     setRetryable(false);
     setProcessing(true);
 
-    const intent = readGoogleSignupIntent();
-    void withCallbackTimeout(completeGoogleSignIn(intent)).then((result) => {
+    const intent = isExistingGoogleEmailLogin ? undefined : readGoogleSignupIntent();
+    const completion = isExistingGoogleEmailLogin
+      ? completeExistingGoogleEmailLogin()
+      : completeGoogleSignIn(intent);
+    void withCallbackTimeout(completion).then((result) => {
       if (!result.success || !result.destination) {
-        logAuthInteractionDiagnostic('login.failed', { success: false, method: 'google' });
+        logAuthInteractionDiagnostic('login.failed', {
+          success: false,
+          method: isExistingGoogleEmailLogin ? 'google-email-link' : 'google',
+        });
         setError(result.error ?? 'Unable to complete Google sign-in. Please try again.');
         setRetryable(true);
         setProcessing(false);
         return;
       }
-      logAuthInteractionDiagnostic('login.completed', { success: true, method: 'google' });
+      logAuthInteractionDiagnostic('login.completed', {
+        success: true,
+        method: isExistingGoogleEmailLogin ? 'google-email-link' : 'google',
+      });
       recordAuthDiagnosticNavigation(result.destination, 'react-router-oauth-callback');
       navigate(result.destination, { replace: true });
     }).catch((callbackError: unknown) => {
@@ -111,7 +125,7 @@ export function AuthCallbackPage() {
       setRetryable(true);
       setProcessing(false);
     });
-  }, [attempt, completeGoogleSignIn, location.hash, location.search, navigate]);
+  }, [attempt, completeExistingGoogleEmailLogin, completeGoogleSignIn, location.hash, location.search, navigate]);
 
   const retry = () => {
     setError(undefined);
@@ -123,8 +137,12 @@ export function AuthCallbackPage() {
   return (
     <AuthShell
       brandHeader
-      title="Finishing Google sign-in"
-      subtitle={processing ? 'Verifying your account and preparing your profile.' : undefined}
+      title={new URLSearchParams(location.search).get('flow') === 'existing-google-login'
+        ? 'Finishing email sign-in'
+        : 'Finishing Google sign-in'}
+      subtitle={processing
+        ? 'Verifying your account and preparing your profile.'
+        : undefined}
       onBack={() => navigate('/login', { replace: true })}
     >
       {error ? (

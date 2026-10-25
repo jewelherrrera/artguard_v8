@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useIonRouter } from '@ionic/react';
 import { AuthShell } from '../components/auth/AuthShell';
 import { AuthInput } from '../components/auth/AuthInput';
 import { AuthButton } from '../components/auth/AuthButton';
-import { GoogleAuthButton } from '../components/auth/GoogleAuthButton';
+import { GoogleIdentityLoginButton } from '../components/auth/GoogleIdentityLoginButton';
 import { Icon } from '../assets/icons';
 import { useAuth } from '../context/AuthContext';
 import { validateEmailField, validateRequired } from '../utils/validators';
@@ -20,7 +20,7 @@ interface FormErrors {
 
 export function LoginPage() {
   const ionRouter = useIonRouter();
-  const { login, startGoogleSignIn } = useAuth();
+  const { login, completeExistingGoogleLogin } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -28,16 +28,36 @@ export function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | undefined>();
+  const [googleEmailSent, setGoogleEmailSent] = useState(false);
+  const googleLoginInFlight = useRef(false);
 
-  const handleGoogleSignIn = async () => {
-    if (googleSubmitting) return;
+  const handleGoogleCredential = async (credential: string) => {
+    if (googleLoginInFlight.current) return;
+    googleLoginInFlight.current = true;
     setFormError(undefined);
+    setGoogleEmailSent(false);
     setGoogleSubmitting(true);
-    const result = await startGoogleSignIn();
+    logAuthInteractionDiagnostic('login.started', { destination: '/home', method: 'google' });
+    let result: Awaited<ReturnType<typeof completeExistingGoogleLogin>>;
+    try {
+      result = await completeExistingGoogleLogin(credential);
+    } catch {
+      logAuthInteractionDiagnostic('login.failed', { success: false, method: 'google' });
+      setFormError('Unable to sign in with Google right now. Please try again.');
+      setGoogleSubmitting(false);
+      googleLoginInFlight.current = false;
+      return;
+    }
     if (!result.success) {
+      logAuthInteractionDiagnostic('login.failed', { success: false, method: 'google' });
       setFormError(result.error ?? 'Unable to start Google sign-in. Please try again.');
       setGoogleSubmitting(false);
+      googleLoginInFlight.current = false;
+      return;
     }
+    googleLoginInFlight.current = false;
+    setGoogleSubmitting(false);
+    setGoogleEmailSent(true);
   };
 
   const validate = (): boolean => {
@@ -88,6 +108,11 @@ export function LoginPage() {
         <div className="auth-banner error" role="alert">
           <Icon name="alert" style={{ stroke: 'var(--ag-danger)' }} />
           <span>{formError}</span>
+        </div>
+      )}
+      {googleEmailSent && (
+        <div className="auth-banner" role="status" style={{ marginBottom: 16 }}>
+          <span>Check your email to finish signing in. The secure sign-in link will take you back to ArtGuard Hub.</span>
         </div>
       )}
 
@@ -142,7 +167,14 @@ export function LoginPage() {
         <div style={{ flex: 1, height: 1, background: 'var(--ag-border-soft)' }} />
       </div>
 
-      <GoogleAuthButton loading={googleSubmitting} onClick={() => void handleGoogleSignIn()} />
+      <GoogleIdentityLoginButton
+        disabled={googleSubmitting}
+        onCredential={(credential) => void handleGoogleCredential(credential)}
+        onError={(message) => {
+          setGoogleEmailSent(false);
+          setFormError(message);
+        }}
+      />
 
       <p className="t-xs c-low auth-footnote">
         New to ArtGuard Hub?{' '}

@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from 'react';
 import { Capacitor } from '@capacitor/core';
 import type { AuthResult, AuthUser, MockAccount, UserRole } from '../types/auth';
-import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import { isSupabaseConfigured, supabase, supabaseUrl } from '../lib/supabase';
 import { getMyProfile, ensureMyProfile, usernameFromEmail } from '../lib/supabaseData';
 import { validatePasswordField } from '../utils/validators';
 import {
@@ -235,6 +235,8 @@ interface AuthContextValue {
   backendMode: 'supabase' | 'mock';
   login: (email: string, password: string) => Promise<AuthResult>;
   signUp: (name: string, email: string, password: string, role: UserRole) => Promise<AuthResult>;
+  completeExistingGoogleLogin: (credential: string) => Promise<AuthResult>;
+  completeExistingGoogleEmailLogin: () => Promise<AuthResult & { destination?: AuthenticatedDestination }>;
   startGoogleSignIn: (role?: UserRole) => Promise<AuthResult>;
   completeGoogleSignIn: (intent?: GoogleSignupIntent) => Promise<AuthResult & { destination?: AuthenticatedDestination }>;
   changeEmail: (email: string) => Promise<AuthResult>;
@@ -627,6 +629,128 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const completeExistingGoogleLogin = useCallback(async (credential: string): Promise<AuthResult> => {
+    if (!isSupabaseConfigured || !supabase) {
+      return { success: false, error: 'Google sign-in requires a configured Supabase connection.' };
+    }
+    if (!credential.trim()) {
+      return { success: false, error: 'Google could not verify your account. Please try again.' };
+    }
+
+    try {
+      if (!supabaseUrl) {
+        return { success: false, error: 'Google sign-in requires a configured Supabase connection.' };
+      }
+      const functionUrl = new URL('/functions/v1/google-login-existing', supabaseUrl);
+      const isLocalFunction = functionUrl.hostname === 'localhost' || functionUrl.hostname === '127.0.0.1';
+      if (functionUrl.protocol !== 'https:' && !isLocalFunction) {
+        return { success: false, error: 'Google sign-in is unavailable over an insecure connection.' };
+      }
+
+      const { data, error } = await supabase.functions.invoke('google-login-existing', {
+        body: { credential },
+      });
+      if (error) {
+        if (error.context instanceof Response) {
+          try {
+            const failure: unknown = await error.context.json();
+            if (
+              error.context.status === 404
+              && typeof failure === 'object'
+              && failure !== null
+              && 'code' in failure
+              && failure.code === 'account_not_found'
+            ) {
+              return { success: false, error: 'No ArtGuard Hub account was found. Please sign up first.' };
+            }
+          } catch {
+            return { success: false, error: 'Unable to sign in with Google right now. Please try again.' };
+          }
+        }
+        return { success: false, error: 'Unable to sign in with Google right now. Please try again.' };
+      }
+      if (
+        typeof data !== 'object'
+        || data === null
+        || !('accepted' in data)
+        || data.accepted !== 'true'
+      ) {
+        return { success: false, error: 'Unable to sign in with Google right now. Please try again.' };
+      }
+
+      return { success: true };
+    } catch (error) {
+      logAuthRequestFailure('oauth', error);
+      return { success: false, error: 'Unable to sign in with Google right now. Please try again.' };
+    }
+  }, []);
+
+  const completeExistingGoogleEmailLogin = useCallback(async (): Promise<
+    AuthResult & { destination?: AuthenticatedDestination }
+  > => {
+    const authClient = supabase;
+    if (!isSupabaseConfigured || !authClient) {
+      return { success: false, error: 'Google sign-in requires a configured Supabase connection.' };
+    }
+
+    const rejectUnverifiedSession = async (message: string) => {
+      try {
+        const { error } = await authClient.auth.signOut();
+        if (error) logAuthRequestFailure('oauth', error);
+      } catch (error) {
+        logAuthRequestFailure('oauth', error);
+      }
+      persistSession(null);
+      return { success: false, error: message } as const;
+    };
+
+    try {
+      const { data: sessionData, error: sessionError } = await authClient.auth.getSession();
+      if (sessionError || !sessionData.session) {
+        if (sessionError) logAuthRequestFailure('oauth', sessionError);
+        return rejectUnverifiedSession('This email sign-in link is invalid or expired. Please try Google Login again.');
+      }
+
+      const { data: userData, error: userError } = await authClient.auth.getUser();
+      if (userError || !userData.user || userData.user.id !== sessionData.session.user.id) {
+        if (userError) logAuthRequestFailure('oauth', userError);
+        return rejectUnverifiedSession('Unable to verify this email sign-in. Please try Google Login again.');
+      }
+
+      const profile = await getMyProfile(userData.user.id);
+      if (!profile || (profile.role !== 'artist' && profile.role !== 'client')) {
+        return rejectUnverifiedSession('No ArtGuard Hub account was found. Please sign up first.');
+      }
+
+      const authenticatedUser: AuthUser = {
+        ...authUserFromMetadata(userData.user),
+        name: profile.name,
+        username: profile.username,
+        role: profile.role,
+        bio: profile.bio ?? undefined,
+        interests: profile.interests ?? undefined,
+        avatarDataUrl: profile.avatar_data_url ?? undefined,
+        onboarded: Boolean(profile.onboarded),
+        isPro: Boolean(profile.is_pro),
+        lastSeenAt: profile.last_seen_at ?? undefined,
+        artistVerificationStatus: profile.artist_verification_status ?? undefined,
+        artistVerificationSubmittedAt: profile.artist_verification_submitted_at ?? undefined,
+        artistVerificationReviewedAt: profile.artist_verification_reviewed_at ?? undefined,
+        artistVerificationReviewedBy: profile.artist_verification_reviewed_by ?? undefined,
+        artistVerificationRejectionReason: profile.artist_verification_rejection_reason ?? undefined,
+        artistVerificationArtworkId: profile.artist_verification_artwork_id ?? undefined,
+        isAdmin: Boolean(profile.is_admin),
+      };
+      persistSession(authenticatedUser);
+      setInitializing(false);
+      return { success: true, destination: '/home' };
+    } catch (error) {
+      logAuthRequestFailure('oauth', error);
+      await rejectUnverifiedSession('Unable to complete sign-in. Please try Google Login again.');
+      return { success: false, error: 'Unable to complete sign-in. Please try Google Login again.' };
+    }
+  }, [persistSession]);
+
   const completeGoogleSignIn = useCallback(async (
     intent?: GoogleSignupIntent,
   ): Promise<AuthResult & { destination?: AuthenticatedDestination }> => {
@@ -906,6 +1030,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       backendMode: isSupabaseConfigured ? 'supabase' : 'mock',
       login,
       signUp,
+      completeExistingGoogleLogin,
+      completeExistingGoogleEmailLogin,
       startGoogleSignIn,
       completeGoogleSignIn,
       changeEmail,
@@ -916,7 +1042,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       enableMockPremium,
       logout,
     }),
-    [user, initializing, login, signUp, startGoogleSignIn, completeGoogleSignIn, changeEmail, requestPasswordReset, passwordRecoverySession, clearPasswordRecoverySession, updateProfile, enableMockPremium, logout],
+    [user, initializing, login, signUp, completeExistingGoogleLogin, completeExistingGoogleEmailLogin, startGoogleSignIn, completeGoogleSignIn, changeEmail, requestPasswordReset, passwordRecoverySession, clearPasswordRecoverySession, updateProfile, enableMockPremium, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
