@@ -257,10 +257,7 @@ export function SettingsPage() {
         <SettingsRow
           icon="shield"
           label="About ArtGuard Hub"
-          sublabel="Version 0.1.0 (mock build)"
-          onClick={() =>
-            showToast('ArtGuard Hub — cloaking commissioned art from AI scrapers, one upload at a time.')
-          }
+          onClick={() => navigate('/profile/settings/about')}
         />
       </div>
 

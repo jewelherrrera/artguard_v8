@@ -22,6 +22,7 @@ import { ClientProfilePage } from '../pages/ClientProfilePage';
 import { AnalyticsPage } from '../pages/AnalyticsPage';
 import { PremiumPage } from '../pages/PremiumPage';
 import { SettingsPage } from '../pages/SettingsPage';
+import { AboutPage } from '../pages/AboutPage';
 import { PrivacySecurityPage } from '../pages/PrivacySecurityPage';
 import { AccountManagementPage } from '../pages/AccountManagementPage';
 import { ArtistVerificationPage } from '../pages/ArtistVerificationPage';
@@ -200,6 +201,14 @@ export function AppRoutes() {
         element={
           <RequireAuth>
             <SettingsPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/profile/settings/about"
+        element={
+          <RequireAuth>
+            <AboutPage />
           </RequireAuth>
         }
       />
