@@ -603,9 +603,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setInitializing(false);
       clearGoogleSignupIntent();
       const hasDisplayName = Boolean(profile.name?.trim());
+      const hasSavedInterests = Boolean(profile.interests?.length);
+      const onboardingComplete = Boolean(profile.onboarded || hasSavedInterests);
       const destination: AuthenticatedDestination = !hasDisplayName || !existingProfile
         ? '/onboarding/name'
-        : profile.onboarded
+        : onboardingComplete
           ? '/home'
           : '/onboarding/interests';
       return {
@@ -669,6 +671,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       bio: patch.bio,
       interests: patch.interests,
       avatar_data_url: patch.avatarDataUrl,
+      onboarded: patch.onboarded,
     };
     const { error } = await supabase.from('profiles').update(dbPatch).eq('id', user.id);
     if (error) return { success: false, error: error.message };
