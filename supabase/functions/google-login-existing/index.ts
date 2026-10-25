@@ -40,6 +40,25 @@ function jsonResponse(
   });
 }
 
+function credentialFailureStage(error: unknown): string {
+  if (typeof error !== 'object' || error === null) return 'jwt_invalid';
+  const details = error as Record<string, unknown>;
+  const code = typeof details.code === 'string' ? details.code : '';
+  const claim = typeof details.claim === 'string' ? details.claim : '';
+
+  if (code === 'ERR_JWT_EXPIRED') return 'expired_token';
+  if (code === 'ERR_JWT_CLAIM_VALIDATION_FAILED' && claim === 'aud') return 'audience_mismatch';
+  if (code === 'ERR_JWT_CLAIM_VALIDATION_FAILED' && claim === 'iss') return 'invalid_issuer';
+  if (code === 'ERR_JWS_SIGNATURE_VERIFICATION_FAILED' || code === 'ERR_JWKS_NO_MATCHING_KEY') {
+    return 'signature_invalid';
+  }
+  if (code.startsWith('ERR_JWKS_') || code === 'ERR_JOSE_ALG_NOT_ALLOWED') {
+    return 'key_or_algorithm_verification_failed';
+  }
+  if (code === 'ERR_JWT_CLAIM_VALIDATION_FAILED' && claim === 'sub') return 'missing_subject';
+  return 'jwt_invalid';
+}
+
 function findGoogleIdentity(user: {
   identities?: Array<{
     id?: string;
@@ -95,29 +114,41 @@ Deno.serve(async (request: Request) => {
   }
 
   try {
-    const googleClientId = Deno.env.get('GOOGLE_CLIENT_ID');
+    const googleClientId = Deno.env.get('GOOGLE_CLIENT_ID')?.trim();
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const publishableKey = Deno.env.get('SUPABASE_ANON_KEY');
-    if (!googleClientId || !supabaseUrl || !serviceRoleKey || !publishableKey) {
-      throw new Error('Server authentication configuration is incomplete.');
+    if (!googleClientId) {
+      console.error('google-login-existing: credential rejected.', { stage: 'google_client_id_missing' });
+      return jsonResponse({ error: 'Unable to verify Google sign-in.', code: 'google_client_id_missing' }, 500, origin);
+    }
+    if (!supabaseUrl || !serviceRoleKey || !publishableKey) {
+      console.error('google-login-existing: server configuration is incomplete.', { stage: 'supabase_configuration_missing' });
+      return jsonResponse({ error: 'Unable to complete Google sign-in.' }, 500, origin);
     }
 
     const bodyText = await request.text();
     if (bodyText.length > 16_384) {
+      console.warn('google-login-existing: credential rejected.', { stage: 'request_too_large' });
       return jsonResponse({ error: 'Invalid request.' }, 400, origin);
     }
     let body: unknown;
     try {
       body = JSON.parse(bodyText);
     } catch {
+      console.warn('google-login-existing: credential rejected.', { stage: 'invalid_request_json' });
       return jsonResponse({ error: 'Invalid request.' }, 400, origin);
     }
     const credential = typeof body === 'object' && body !== null && 'credential' in body
       ? body.credential
       : undefined;
-    if (typeof credential !== 'string' || credential.length < 20 || credential.length > 12_000) {
-      return jsonResponse({ error: 'Invalid Google credential.' }, 401, origin);
+    if (typeof credential !== 'string' || credential.length === 0) {
+      console.warn('google-login-existing: credential rejected.', { stage: 'missing_credential' });
+      return jsonResponse({ error: 'Invalid Google credential.', code: 'missing_credential' }, 401, origin);
+    }
+    if (credential.length < 20 || credential.length > 12_000) {
+      console.warn('google-login-existing: credential rejected.', { stage: 'credential_malformed' });
+      return jsonResponse({ error: 'Invalid Google credential.', code: 'credential_malformed' }, 401, origin);
     }
 
     let claims;
@@ -127,14 +158,25 @@ Deno.serve(async (request: Request) => {
         audience: googleClientId,
         issuer: GOOGLE_ISSUERS,
       }));
-    } catch {
-      return jsonResponse({ error: 'Invalid Google credential.' }, 401, origin);
+    } catch (error) {
+      const stage = credentialFailureStage(error);
+      console.warn('google-login-existing: credential rejected.', { stage });
+      return jsonResponse({ error: 'Invalid Google credential.', code: stage }, 401, origin);
     }
 
     const subject = typeof claims.sub === 'string' ? claims.sub : '';
     const email = typeof claims.email === 'string' ? claims.email.trim().toLowerCase() : '';
-    if (!subject || !email || claims.email_verified !== true) {
-      return jsonResponse({ error: 'Invalid Google credential.' }, 401, origin);
+    if (!subject) {
+      console.warn('google-login-existing: credential rejected.', { stage: 'missing_subject' });
+      return jsonResponse({ error: 'Invalid Google credential.', code: 'missing_subject' }, 401, origin);
+    }
+    if (!email) {
+      console.warn('google-login-existing: credential rejected.', { stage: 'missing_email' });
+      return jsonResponse({ error: 'Invalid Google credential.', code: 'missing_email' }, 401, origin);
+    }
+    if (claims.email_verified !== true) {
+      console.warn('google-login-existing: credential rejected.', { stage: 'email_not_verified' });
+      return jsonResponse({ error: 'Invalid Google credential.', code: 'email_not_verified' }, 401, origin);
     }
 
     const admin = createClient(supabaseUrl, serviceRoleKey, {
