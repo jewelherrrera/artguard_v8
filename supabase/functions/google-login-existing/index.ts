@@ -89,6 +89,15 @@ async function unverifiedAudienceFingerprints(token: string): Promise<string[]> 
   }
 }
 
+async function verifiedAudienceFingerprints(audience: unknown): Promise<string[]> {
+  const audiences = typeof audience === 'string'
+    ? [audience]
+    : Array.isArray(audience)
+      ? audience.filter((value): value is string => typeof value === 'string')
+      : [];
+  return Promise.all(audiences.map(fingerprint));
+}
+
 function findGoogleIdentity(user: {
   identities?: Array<{
     id?: string;
@@ -197,12 +206,19 @@ Deno.serve(async (request: Request) => {
       const diagnosticAudienceMatch = tokenAudienceFingerprints.includes(expectedAudienceFingerprint);
       console.warn('google-login-existing: credential rejected.', {
         stage,
+        tokenAudienceTrust: 'unverified_diagnostic_only',
         expectedAudienceFingerprint,
         tokenAudienceFingerprints,
         diagnosticAudienceMatch,
       });
       return jsonResponse({ error: 'Invalid Google credential.', code: stage }, 401, origin);
     }
+
+    console.info('google-login-existing: credential verified.', {
+      stage: 'jwt_verified',
+      expectedAudienceFingerprint: await fingerprint(googleClientId),
+      verifiedTokenAudienceFingerprints: await verifiedAudienceFingerprints(claims.aud),
+    });
 
     const subject = typeof claims.sub === 'string' ? claims.sub : '';
     const email = typeof claims.email === 'string' ? claims.email.trim().toLowerCase() : '';

@@ -95,6 +95,7 @@ export function GoogleIdentityLoginButton({
 
     void googleClientIdFingerprint(clientId)
       .then((fingerprint) => console.info('ArtGuard Google Login client configuration.', {
+        source: 'VITE_GOOGLE_CLIENT_ID',
         clientIdFingerprint: fingerprint,
       }))
       .catch(() => console.warn('ArtGuard Google Login client fingerprint unavailable.'));
