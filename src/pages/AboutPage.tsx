@@ -7,39 +7,39 @@ import './AboutPage.css';
 
 const features = [
   {
-    icon: 'compass',
-    title: 'Discover Artists and Artwork',
-    description: 'Explore artist profiles, portfolios, and artwork to find creators whose style matches your vision.',
+    icon: 'shield',
+    title: 'Protect and Present Your Artwork',
+    description: 'Keep original uploads private and choose whether processed previews appear in your portfolio or discovery. Preview options can add visible ownership marks or visual effects and suppress right-click or drag actions; they cannot prevent every copy, screenshot, or scrape.',
   },
   {
-    icon: 'palette',
-    title: 'Request Art Commissions',
-    description: 'Connect with artists and organize custom artwork requests around your project requirements.',
+    icon: 'compass',
+    title: 'Find Artists and Request Commissions',
+    description: 'Explore artist profiles and portfolios, then use available commission request flows to connect around a project. Artist verification is an application review, not a guarantee of identity or transaction safety.',
   },
   {
     icon: 'chat',
-    title: 'Collaborate in One Place',
-    description: 'Communicate through chat, share artwork, and keep important project conversations together.',
+    title: 'Keep Commission Conversations Organized',
+    description: 'Message directly, share artwork and attachments, and keep project conversations together. Chat blocking is available, but messages are not a scam-detection service.',
   },
   {
     icon: 'check-circle',
     title: 'Manage Commission Progress',
-    description: 'Follow project milestones, deliverables, and approval progress through the commission workspace.',
+    description: 'Use the commission workspace to follow progress, submit and review milestones, share deliverables, and record approvals as the project moves forward.',
   },
 ] as const;
 
 const principles = [
   {
-    title: 'Artist-first',
-    description: 'Give artists a space to showcase their talent and portfolios.',
+    title: 'Respect for Creative Ownership',
+    description: "Encourage permission, appropriate attribution, and respect for artists' work.",
   },
   {
-    title: 'Meaningful Collaboration',
-    description: 'Help artists and clients communicate and organize their creative projects.',
+    title: 'Safer Commission Experiences',
+    description: 'Encourage clear communication, transparent project expectations, and responsible interactions.',
   },
   {
-    title: 'Respect for Creative Work',
-    description: 'Encourage responsible collaboration and respect for artwork and attribution.',
+    title: 'Artist-Centered Design',
+    description: 'Prioritize tools and workflows that support artists while enabling clients to work with creators effectively.',
   },
 ] as const;
 
@@ -65,24 +65,39 @@ export function AboutPage() {
       <div className="about-page">
         <section className="about-hero card ag-liquid-glass-strong" aria-labelledby="about-title">
           <div className="about-hero-mark" aria-hidden="true">
-            <Icon name="palette" />
+            <Icon name="shield" />
           </div>
           <div className="about-hero-copy">
-            <p className="about-eyebrow">A creative space for artists and clients</p>
-            <h1 id="about-title">About ArtGuard Hub</h1>
-            <p className="about-tagline">Where creativity meets collaboration.</p>
+            <p className="about-eyebrow">Built around artist protection</p>
+            <h1 id="about-title">Your Art Deserves Protection.</h1>
+            <p className="about-tagline">Protecting creativity. Supporting safer commissions.</p>
             <p className="about-introduction">
-              ArtGuard Hub is a digital art marketplace designed to connect artists and clients in one creative space.
-              Artists can showcase their work and connect with potential clients, while clients can discover creators,
-              request commissions, and collaborate on creative projects.
+              ArtGuard Hub is a digital art platform built around helping artists present their creative work and
+              navigate commissions with greater confidence. In a digital world where artwork can be reused without
+              permission and commission scams are a concern, ArtGuard Hub brings artist profiles, artwork sharing,
+              direct communication, and commission management together in one place. Its available preview safeguards
+              can add deterrents, but cannot guarantee that artwork will not be copied or scraped.
             </p>
           </div>
         </section>
 
+        <section className="about-section about-why" aria-labelledby="about-why-title">
+          <div className="about-section-heading">
+            <span className="about-kicker">The challenges artists face</span>
+            <h2 id="about-why-title">Why ArtGuard Hub Exists</h2>
+          </div>
+          <p>
+            Digital artists face concerns including AI scraping and artwork copied, redistributed, or used without
+            permission. Online commission requests can also involve impersonation or dishonest interactions, while
+            unclear requirements, communication, and progress can make projects harder to navigate. These are challenges
+            ArtGuard Hub aims to help artists manage—not risks the app can eliminate.
+          </p>
+        </section>
+
         <section className="about-section" aria-labelledby="about-features-title">
           <div className="about-section-heading">
-            <span className="about-kicker">The creative process</span>
-            <h2 id="about-features-title">What You Can Do Here</h2>
+            <span className="about-kicker">Tools for presenting work and navigating commissions</span>
+            <h2 id="about-features-title">How ArtGuard Hub Supports Artists</h2>
           </div>
           <div className="about-feature-grid">
             {features.map((feature) => (
@@ -99,15 +114,21 @@ export function AboutPage() {
           </div>
         </section>
 
+        <aside className="about-protection-note" aria-label="Artwork protection limitations">
+          No online platform can guarantee that digital artwork will never be copied, scraped, or misused. ArtGuard Hub
+          aims to support artists through its available tools and commission workflows, while encouraging responsible
+          use and respect for creative ownership.
+        </aside>
+
         <section className="about-mission card ag-liquid-glass" aria-labelledby="about-mission-title">
           <div className="about-section-heading">
             <span className="about-kicker">Our purpose</span>
             <h2 id="about-mission-title">Our Mission</h2>
           </div>
           <p>
-            Our mission is to create an accessible, artist-centered space for digital art commissions—helping artists
-            showcase their creativity, connect with clients, and organize their work while making it easier for clients
-            to discover and collaborate with talented creators.
+            Our mission is to help digital artists present their work with greater confidence and navigate commissions
+            through clearer communication and more organized project workflows. We aim to support a creative community
+            that respects artists&apos; work and encourages responsible collaboration between artists and clients.
           </p>
         </section>
 

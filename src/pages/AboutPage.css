@@ -100,6 +100,14 @@
   min-width: 0;
 }
 
+.about-why > p {
+  max-width: 860px;
+  margin: 0;
+  color: var(--ag-text-mid);
+  font-size: 14px;
+  line-height: 1.75;
+}
+
 .about-section-heading {
   margin-bottom: 16px;
 }
@@ -176,6 +184,16 @@
 .about-mission > p {
   max-width: 860px;
   font-size: 14px;
+}
+
+.about-protection-note {
+  padding: 14px 16px;
+  border-left: 3px solid var(--ag-primary);
+  border-radius: 0 var(--ag-r-sm) var(--ag-r-sm) 0;
+  background: color-mix(in srgb, var(--ag-glass-standard-bg) 72%, transparent);
+  color: var(--ag-text-low);
+  font-size: 12px;
+  line-height: 1.7;
 }
 
 .about-values-grid {
