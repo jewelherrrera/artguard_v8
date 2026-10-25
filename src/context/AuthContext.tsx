@@ -23,6 +23,8 @@ const GOOGLE_NAME_ONBOARDING_KEY = 'artguard.googleNameOnboarding';
 export interface GoogleSignupIntent {
   role: UserRole;
   startedAt: number;
+  userId?: string;
+  step?: 'name' | 'interests';
 }
 
 function clearGoogleSignupIntent() {
@@ -54,6 +56,42 @@ function clearGoogleNameOnboarding() {
     sessionStorage.removeItem(GOOGLE_NAME_ONBOARDING_KEY);
   } catch {
     // Session storage may be unavailable in restrictive browser modes.
+  }
+}
+
+export function updateGoogleSignupIntent(
+  userId: string,
+  update: Partial<Pick<GoogleSignupIntent, 'step'>>,
+) {
+  try {
+    const stored: unknown = JSON.parse(sessionStorage.getItem(GOOGLE_SIGNUP_INTENT_KEY) ?? 'null');
+    if (
+      typeof stored === 'object'
+      && stored !== null
+      && 'userId' in stored
+      && stored.userId === userId
+    ) {
+      sessionStorage.setItem(GOOGLE_SIGNUP_INTENT_KEY, JSON.stringify({ ...stored, ...update }));
+    }
+  } catch {
+    console.warn('ArtGuard: could not update Google signup recovery state.');
+  }
+}
+
+export function completeGoogleSignupOnboarding(userId: string) {
+  try {
+    const stored: unknown = JSON.parse(sessionStorage.getItem(GOOGLE_SIGNUP_INTENT_KEY) ?? 'null');
+    if (
+      typeof stored === 'object'
+      && stored !== null
+      && 'userId' in stored
+      && stored.userId === userId
+    ) {
+      clearGoogleSignupIntent();
+      clearGoogleNameOnboarding();
+    }
+  } catch {
+    console.warn('ArtGuard: could not clear completed Google signup recovery state.');
   }
 }
 
@@ -526,15 +564,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (role) {
-      const intent: GoogleSignupIntent = { role, startedAt: Date.now() };
       try {
-        sessionStorage.setItem(GOOGLE_SIGNUP_INTENT_KEY, JSON.stringify(intent));
+        const stored: unknown = JSON.parse(sessionStorage.getItem(GOOGLE_SIGNUP_INTENT_KEY) ?? 'null');
+        const hasPendingSignup = typeof stored === 'object'
+          && stored !== null
+          && 'role' in stored
+          && (stored.role === 'artist' || stored.role === 'client')
+          && 'startedAt' in stored
+          && typeof stored.startedAt === 'number'
+          && Number.isFinite(stored.startedAt);
+        if (!hasPendingSignup) {
+          const intent: GoogleSignupIntent = { role, startedAt: Date.now() };
+          sessionStorage.setItem(GOOGLE_SIGNUP_INTENT_KEY, JSON.stringify(intent));
+        }
       } catch {
         return { success: false, error: 'Unable to start Google sign-in. Please enable session storage and try again.' };
       }
-    } else {
-      clearGoogleSignupIntent();
-      clearGoogleNameOnboarding();
     }
 
     try {
@@ -543,13 +588,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         options: { redirectTo: `${window.location.origin}/auth/callback` },
       });
       if (error) {
-        clearGoogleSignupIntent();
         logAuthRequestFailure('oauth', error);
         return { success: false, error: 'Unable to start Google sign-in. Please try again.' };
       }
       return { success: true };
     } catch (error) {
-      clearGoogleSignupIntent();
       logAuthRequestFailure('oauth', error);
       return {
         success: false,
@@ -580,6 +623,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const authUser = data.user;
+      const createdAt = Date.parse(authUser.created_at);
+      const isBoundSignupIntent = intent?.userId === authUser.id;
+      const canBindSignupIntent = intent !== undefined
+        && intent.userId === undefined
+        && Number.isFinite(createdAt)
+        && createdAt >= intent.startedAt;
+      const isNewGoogleAccount = isBoundSignupIntent || canBindSignupIntent;
+      const signupStep = isNewGoogleAccount ? intent?.step ?? 'name' : undefined;
+      if (canBindSignupIntent && intent) {
+        intent.userId = authUser.id;
+        intent.step = 'name';
+        try {
+          sessionStorage.setItem(GOOGLE_SIGNUP_INTENT_KEY, JSON.stringify(intent));
+        } catch {
+          console.warn('ArtGuard: could not bind Google signup recovery state.');
+        }
+      }
       let existingProfile;
       try {
         existingProfile = await getMyProfile(authUser.id);
@@ -587,37 +647,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logAuthRequestFailure('oauth', error);
         return { success: false, error: 'Unable to load your profile. Check your connection and try again.' };
       }
-      const createdAt = Date.parse(authUser.created_at);
-      const isNewGoogleAccount = intent !== undefined
-        && Number.isFinite(createdAt)
-        && createdAt >= intent.startedAt;
       const metadataName = googleDisplayName(authUser);
       const metadataRole = authUser.user_metadata?.role;
       const role: UserRole = isNewGoogleAccount
         ? intent.role
         : metadataRole === 'artist' ? 'artist' : 'client';
-      const profile = existingProfile ?? await ensureMyProfile({
-        id: authUser.id,
-        name: String(authUser.user_metadata?.full_name ?? authUser.user_metadata?.name ?? authUser.email?.split('@')[0] ?? 'User'),
-        username: usernameFromEmail(authUser.email),
-        role,
-        onboarded: false,
-      });
+      let profile = existingProfile;
+      if (!profile) {
+        try {
+          profile = await ensureMyProfile({
+            id: authUser.id,
+            name: String(authUser.user_metadata?.full_name ?? authUser.user_metadata?.name ?? authUser.email?.split('@')[0] ?? 'User'),
+            username: usernameFromEmail(authUser.email),
+            role,
+            onboarded: false,
+          });
+        } catch (error) {
+          logAuthRequestFailure('oauth', error);
+          return { success: false, error: 'Unable to create your profile. Check your connection and try again.' };
+        }
+      }
       if (!profile) {
         return { success: false, error: 'Unable to set up your profile. Please try again.' };
       }
-      if (isNewGoogleAccount && profile.role !== role) {
-        const { data: roleUpdatedProfile, error: roleUpdateError } = await supabase
+      const isCompletedProfile = Boolean(profile.onboarded || profile.interests?.length);
+      const isIncompleteGoogleSignup = isNewGoogleAccount && !isCompletedProfile;
+      if (isIncompleteGoogleSignup && profile.role !== role) {
+        const { error: roleUpdateError } = await supabase
           .from('profiles')
           .update({ role })
-          .eq('id', authUser.id)
-          .select('*')
-          .maybeSingle();
-        if (roleUpdateError || !roleUpdatedProfile) {
-          if (roleUpdateError) logAuthRequestFailure('oauth', roleUpdateError);
-          return { success: false, error: 'Unable to finish setting up your account. Please try again.' };
+          .eq('id', authUser.id);
+        if (roleUpdateError) {
+          const { code, status } = getAuthErrorMetadata(roleUpdateError);
+          console.warn('ArtGuard: Google signup role update failed.', {
+            code: code ?? 'unknown',
+            status: status ?? null,
+          });
+          return { success: false, error: 'Unable to save your selected account type. Please try again.' };
         }
-        Object.assign(profile, roleUpdatedProfile);
+        try {
+          const savedProfile = await getMyProfile(authUser.id);
+          if (!savedProfile || savedProfile.role !== role) {
+            console.warn('ArtGuard: Google signup role update was not confirmed.');
+            return { success: false, error: 'Unable to verify your selected account type. Please try again.' };
+          }
+          profile = savedProfile;
+        } catch (error) {
+          logAuthRequestFailure('oauth', error);
+          return { success: false, error: 'Unable to verify your profile update. Check your connection and try again.' };
+        }
       }
 
       const authenticatedUser: AuthUser = {
@@ -641,17 +719,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
       persistSession(authenticatedUser);
       setInitializing(false);
-      clearGoogleSignupIntent();
       if (isNewGoogleAccount) storeGoogleNameOnboarding(authUser.id, metadataName ?? '');
-      else clearGoogleNameOnboarding();
       const hasDisplayName = Boolean(profile.name?.trim());
       const hasSavedInterests = Boolean(profile.interests?.length);
       const onboardingComplete = Boolean(profile.onboarded || hasSavedInterests);
-      const destination: AuthenticatedDestination = isNewGoogleAccount || !hasDisplayName || !existingProfile
-        ? '/onboarding/name'
-        : onboardingComplete
+      const destination: AuthenticatedDestination = isNewGoogleAccount
+        ? isCompletedProfile
           ? '/home'
-          : '/onboarding/interests';
+          : signupStep === 'interests'
+          ? '/onboarding/interests'
+          : '/onboarding/name'
+        : !hasDisplayName || !existingProfile
+          ? '/onboarding/name'
+          : onboardingComplete
+            ? '/home'
+            : '/onboarding/interests';
+      if ((!isNewGoogleAccount || isCompletedProfile) && onboardingComplete) {
+        clearGoogleSignupIntent();
+        clearGoogleNameOnboarding();
+      }
       return {
         success: true,
         destination,

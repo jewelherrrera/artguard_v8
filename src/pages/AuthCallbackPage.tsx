@@ -31,20 +31,17 @@ function readGoogleSignupIntent(): GoogleSignupIntent | undefined {
       && typeof intent.startedAt === 'number'
       && Number.isFinite(intent.startedAt)
     ) {
-      return { role: intent.role, startedAt: intent.startedAt };
+      return {
+        role: intent.role,
+        startedAt: intent.startedAt,
+        ...('userId' in intent && typeof intent.userId === 'string' ? { userId: intent.userId } : {}),
+        ...('step' in intent && (intent.step === 'name' || intent.step === 'interests') ? { step: intent.step } : {}),
+      };
     }
   } catch {
     return undefined;
   }
   return undefined;
-}
-
-function clearGoogleSignupIntent() {
-  try {
-    sessionStorage.removeItem(GOOGLE_SIGNUP_INTENT_KEY);
-  } catch {
-    // Session storage may be unavailable in restrictive browser modes.
-  }
 }
 
 function withCallbackTimeout<T>(operation: Promise<T>): Promise<T> {
@@ -79,7 +76,6 @@ export function AuthCallbackPage() {
     );
     const providerError = callbackParams.get('error_code') ?? callbackParams.get('error');
     if (providerError) {
-      clearGoogleSignupIntent();
       handledAttempt.current = attempt;
       const cancelled = providerError === 'access_denied' || providerError === 'user_cancelled';
       setError(cancelled

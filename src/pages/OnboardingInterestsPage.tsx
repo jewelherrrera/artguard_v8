@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AuthShell } from '../components/auth/AuthShell';
 import { AuthButton } from '../components/auth/AuthButton';
 import { Icon } from '../assets/icons';
-import { useAuth } from '../context/AuthContext';
+import { completeGoogleSignupOnboarding, useAuth } from '../context/AuthContext';
 import { INTEREST_OPTIONS } from '../data/mockData';
 import {
   logAuthInteractionDiagnostic,
@@ -14,7 +14,7 @@ import {
 /** Step 2 of post-sign-up onboarding: pick interests, then land on the Dashboard. */
 export function OnboardingInterestsPage() {
   const navigate = useNavigate();
-  const { updateProfile } = useAuth();
+  const { user, updateProfile } = useAuth();
   const [selected, setSelected] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | undefined>();
@@ -36,6 +36,7 @@ export function OnboardingInterestsPage() {
       setError(result.error ?? 'Could not save your interests. Please try again.');
       return;
     }
+    if (user) completeGoogleSignupOnboarding(user.id);
     logAuthInteractionDiagnostic('onboarding.completed', { destination: '/home' });
     recordAuthDiagnosticNavigation('/home', 'react-router-useNavigate');
     navigate('/home', { replace: true });

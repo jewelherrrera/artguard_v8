@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { AuthShell } from '../components/auth/AuthShell';
 import { AuthInput } from '../components/auth/AuthInput';
 import { AuthButton } from '../components/auth/AuthButton';
-import { useAuth } from '../context/AuthContext';
+import { updateGoogleSignupIntent, useAuth } from '../context/AuthContext';
 import { validateRequired } from '../utils/validators';
 import {
   logAuthInteractionDiagnostic,
@@ -67,6 +67,7 @@ export function OnboardingNamePage() {
       setError(result.error ?? 'Could not save your profile. Please try again.');
       return;
     }
+    if (user) updateGoogleSignupIntent(user.id, { step: 'interests' });
     clearGoogleNameOnboardingValue();
     logAuthInteractionDiagnostic('onboarding.step.completed', { destination: '/onboarding/interests' });
     recordAuthDiagnosticNavigation('/onboarding/interests', 'react-router-useNavigate');
