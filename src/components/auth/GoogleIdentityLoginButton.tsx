@@ -94,11 +94,11 @@ export function GoogleIdentityLoginButton({
     }
 
     void googleClientIdFingerprint(clientId)
-      .then((fingerprint) => console.info('ArtGuard Google Login client configuration.', {
+      .then((clientIdFingerprint) => console.info(`[AG GoogleAudienceDiag] ${JSON.stringify({
         source: 'VITE_GOOGLE_CLIENT_ID',
-        clientIdFingerprint: fingerprint,
-      }))
-      .catch(() => console.warn('ArtGuard Google Login client fingerprint unavailable.'));
+        clientIdFingerprint,
+      })}`))
+      .catch(() => console.warn('[AG GoogleAudienceDiag] frontend_fingerprint_unavailable'));
 
     let active = true;
     void loadGoogleIdentityScript().then(() => {

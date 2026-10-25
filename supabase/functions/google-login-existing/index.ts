@@ -199,26 +199,26 @@ Deno.serve(async (request: Request) => {
       }));
     } catch (error) {
       const stage = credentialFailureStage(error);
-      const expectedAudienceFingerprint = await fingerprint(googleClientId);
-      const tokenAudienceFingerprints = stage === 'audience_mismatch'
-        ? await unverifiedAudienceFingerprints(credential)
-        : [];
-      const diagnosticAudienceMatch = tokenAudienceFingerprints.includes(expectedAudienceFingerprint);
-      console.warn('google-login-existing: credential rejected.', {
-        stage,
-        tokenAudienceTrust: 'unverified_diagnostic_only',
-        expectedAudienceFingerprint,
-        tokenAudienceFingerprints,
-        diagnosticAudienceMatch,
-      });
+      if (stage === 'audience_mismatch') {
+        const expectedClientIdFingerprint = await fingerprint(googleClientId);
+        const unverifiedTokenAudienceFingerprints = await unverifiedAudienceFingerprints(credential);
+        console.warn(`[AG GoogleAudienceDiag] ${JSON.stringify({
+          stage,
+          expectedClientIdFingerprint,
+          tokenAudienceTrust: 'unverified_diagnostic_only',
+          unverifiedTokenAudienceFingerprints,
+        })}`);
+      } else {
+        console.warn('google-login-existing: credential rejected.', { stage });
+      }
       return jsonResponse({ error: 'Invalid Google credential.', code: stage }, 401, origin);
     }
 
-    console.info('google-login-existing: credential verified.', {
+    console.info(`[AG GoogleAudienceDiag] ${JSON.stringify({
       stage: 'jwt_verified',
-      expectedAudienceFingerprint: await fingerprint(googleClientId),
+      expectedClientIdFingerprint: await fingerprint(googleClientId),
       verifiedTokenAudienceFingerprints: await verifiedAudienceFingerprints(claims.aud),
-    });
+    })}`);
 
     const subject = typeof claims.sub === 'string' ? claims.sub : '';
     const email = typeof claims.email === 'string' ? claims.email.trim().toLowerCase() : '';
