@@ -16,7 +16,7 @@ const SESSION_KEY = 'artguard.session';
 const MOCK_LATENCY_MS = 650;
 type ProfileUpdatePatch = Partial<Omit<AuthUser, 'isPro'>>;
 type AuthOperation = 'login' | 'signup' | 'oauth';
-type AuthenticatedDestination = '/home' | '/onboarding/name';
+type AuthenticatedDestination = '/home' | '/onboarding/name' | '/onboarding/interests';
 const GOOGLE_SIGNUP_INTENT_KEY = 'artguard.googleSignupIntent';
 
 export interface GoogleSignupIntent {
@@ -172,7 +172,31 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-async function publicUserFromSession(authUser: { id: string; email?: string | null; created_at?: string; user_metadata?: Record<string, unknown> }): Promise<AuthUser> {
+type SupabaseAuthUser = {
+  id: string;
+  email?: string | null;
+  created_at?: string;
+  user_metadata?: Record<string, unknown>;
+};
+
+function authUserFromMetadata(authUser: SupabaseAuthUser): AuthUser {
+  const metadataName = authUser.user_metadata?.full_name ?? authUser.user_metadata?.name;
+  const metadataRole = authUser.user_metadata?.role;
+  return {
+    id: authUser.id,
+    name: typeof metadataName === 'string' && metadataName.trim()
+      ? metadataName
+      : authUser.email?.split('@')[0] ?? 'User',
+    email: authUser.email ?? '',
+    username: usernameFromEmail(authUser.email),
+    role: metadataRole === 'artist' ? 'artist' : 'client',
+    createdAt: authUser.created_at,
+    onboarded: Boolean(authUser.user_metadata?.onboarded),
+  };
+}
+
+async function publicUserFromSession(authUser: SupabaseAuthUser): Promise<AuthUser> {
+  const fallback = authUserFromMetadata(authUser);
   let profile = null;
   try {
     profile = await getMyProfile(authUser.id);
@@ -182,16 +206,14 @@ async function publicUserFromSession(authUser: { id: string; email?: string | nu
   }
 
   return {
-    id: authUser.id,
-    name: (profile?.name ?? authUser.user_metadata?.name ?? authUser.email?.split('@')[0] ?? 'User') as string,
-    email: authUser.email ?? '',
-    username: profile?.username ?? usernameFromEmail(authUser.email),
-    role: ((profile?.role ?? authUser.user_metadata?.role ?? 'client') as UserRole),
-    createdAt: authUser.created_at,
+    ...fallback,
+    name: profile?.name ?? fallback.name,
+    username: profile?.username ?? fallback.username,
+    role: profile?.role ?? fallback.role,
     bio: profile?.bio ?? undefined,
     interests: profile?.interests ?? undefined,
     avatarDataUrl: profile?.avatar_data_url ?? undefined,
-    onboarded: Boolean(profile?.onboarded ?? authUser.user_metadata?.onboarded),
+    onboarded: Boolean(profile?.onboarded ?? fallback.onboarded),
     isPro: Boolean(profile?.is_pro),
     lastSeenAt: profile?.last_seen_at ?? undefined,
     artistVerificationStatus: profile?.artist_verification_status ?? undefined,
@@ -309,57 +331,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         return;
       }
+      if (window.location.pathname === '/auth/callback') return;
       if (event === 'PASSWORD_RECOVERY') {
         setPasswordRecoverySession(true);
-        setInitializing(false);
-        logAuthInteractionDiagnostic('auth.initialization.completed', {
-          eventType: event,
-          initializing: false,
-          hasUser: true,
-          isAuthenticated: true,
-          supabaseConfigured: true,
-        });
       } else if (event === 'SIGNED_IN') {
         setPasswordRecoverySession(false);
       }
-      void publicUserFromSession(session.user).then((next) => {
-        if (!active || revision !== authStateRevision.current) return;
-        setUser(next);
-        if (event === 'INITIAL_SESSION') {
-          setInitializing(false);
-          logAuthInteractionDiagnostic('auth.initialization.completed', {
-            eventType: event,
-            initializing: false,
-            hasUser: true,
-            isAuthenticated: true,
-            supabaseConfigured: true,
-          });
-        }
-        void refreshProfileForUser(session.user.id, next).then((refreshed) => {
-          if (active && revision === authStateRevision.current) setUser(refreshed);
-        });
-      }).catch((error) => {
-        if (active && revision === authStateRevision.current) {
+      window.setTimeout(() => {
+        void publicUserFromSession(session.user).then((next) => {
+          if (!active || revision !== authStateRevision.current) return;
+          setUser(next);
           if (event === 'INITIAL_SESSION') {
             setInitializing(false);
-            logAuthInteractionDiagnostic('auth.initialization.failed', {
+            logAuthInteractionDiagnostic('auth.initialization.completed', {
               eventType: event,
               initializing: false,
               hasUser: true,
               isAuthenticated: true,
               supabaseConfigured: true,
             });
-          } else {
-            logAuthInteractionDiagnostic('auth.state.hydration-failed', {
-              eventType: event,
-              hasUser: true,
-              isAuthenticated: true,
-              supabaseConfigured: true,
-            });
           }
-          console.error('ArtGuard: auth state update failed', error);
-        }
-      });
+          void refreshProfileForUser(session.user.id, next).then((refreshed) => {
+            if (active && revision === authStateRevision.current) setUser(refreshed);
+          });
+        }).catch((error) => {
+          if (active && revision === authStateRevision.current) {
+            if (event === 'INITIAL_SESSION') {
+              setInitializing(false);
+              logAuthInteractionDiagnostic('auth.initialization.failed', {
+                eventType: event,
+                initializing: false,
+                hasUser: true,
+                isAuthenticated: true,
+                supabaseConfigured: true,
+              });
+            } else {
+              logAuthInteractionDiagnostic('auth.state.hydration-failed', {
+                eventType: event,
+                hasUser: true,
+                isAuthenticated: true,
+                supabaseConfigured: true,
+              });
+            }
+            console.error('ArtGuard: auth state update failed', error);
+          }
+        });
+      }, 0);
     });
 
     return () => {
@@ -525,14 +542,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const { data, error } = await supabase.auth.getUser();
-      if (error || !data.user) {
-        if (error) logAuthRequestFailure('oauth', error);
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session) {
+        if (sessionError) logAuthRequestFailure('oauth', sessionError);
         return { success: false, error: 'Unable to complete Google sign-in. Please try again.' };
+      }
+      const { data, error } = await supabase.auth.getUser();
+      if (error || !data.user || data.user.id !== sessionData.session.user.id) {
+        if (error) logAuthRequestFailure('oauth', error);
+        return { success: false, error: 'Unable to verify your Google account. Please try again.' };
       }
 
       const authUser = data.user;
-      const existingProfile = await getMyProfile(authUser.id);
+      let existingProfile;
+      try {
+        existingProfile = await getMyProfile(authUser.id);
+      } catch (error) {
+        logAuthRequestFailure('oauth', error);
+        return { success: false, error: 'Unable to load your profile. Check your connection and try again.' };
+      }
       const createdAt = Date.parse(authUser.created_at);
       const isNewGoogleAccount = intent !== undefined
         && Number.isFinite(createdAt)
@@ -552,11 +580,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { success: false, error: 'Unable to set up your profile. Please try again.' };
       }
 
-      const authenticatedUser = await publicUserFromSession(authUser);
+      const authenticatedUser: AuthUser = {
+        ...authUserFromMetadata(authUser),
+        name: profile.name,
+        username: profile.username,
+        role: profile.role,
+        bio: profile.bio ?? undefined,
+        interests: profile.interests ?? undefined,
+        avatarDataUrl: profile.avatar_data_url ?? undefined,
+        onboarded: Boolean(profile.onboarded),
+        isPro: Boolean(profile.is_pro),
+        lastSeenAt: profile.last_seen_at ?? undefined,
+        artistVerificationStatus: profile.artist_verification_status ?? undefined,
+        artistVerificationSubmittedAt: profile.artist_verification_submitted_at ?? undefined,
+        artistVerificationReviewedAt: profile.artist_verification_reviewed_at ?? undefined,
+        artistVerificationReviewedBy: profile.artist_verification_reviewed_by ?? undefined,
+        artistVerificationRejectionReason: profile.artist_verification_rejection_reason ?? undefined,
+        artistVerificationArtworkId: profile.artist_verification_artwork_id ?? undefined,
+        isAdmin: Boolean(profile.is_admin),
+      };
       persistSession(authenticatedUser);
+      setInitializing(false);
+      clearGoogleSignupIntent();
+      const hasDisplayName = Boolean(profile.name?.trim());
+      const destination: AuthenticatedDestination = !hasDisplayName || !existingProfile
+        ? '/onboarding/name'
+        : profile.onboarded
+          ? '/home'
+          : '/onboarding/interests';
       return {
         success: true,
-        destination: authenticatedUser.onboarded ? '/home' : '/onboarding/name',
+        destination,
       };
     } catch (error) {
       logAuthRequestFailure('oauth', error);
