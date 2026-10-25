@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { AuthShell } from '../components/auth/AuthShell';
 import { AuthInput } from '../components/auth/AuthInput';
 import { AuthButton } from '../components/auth/AuthButton';
+import { GoogleAuthButton } from '../components/auth/GoogleAuthButton';
 import { RoleToggle } from '../components/auth/RoleToggle';
 import { Icon } from '../assets/icons';
 import { useAuth } from '../context/AuthContext';
@@ -30,7 +31,7 @@ interface FormErrors {
 
 export function SignUpPage() {
   const navigate = useNavigate();
-  const { signUp } = useAuth();
+  const { signUp, startGoogleSignIn } = useAuth();
 
   const [role, setRole] = useState<UserRole>('artist');
   const [name, setName] = useState('');
@@ -39,8 +40,20 @@ export function SignUpPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitting, setSubmitting] = useState(false);
+  const [googleSubmitting, setGoogleSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | undefined>();
   const passwordAssessment = assessPassword(password);
+
+  const handleGoogleSignIn = async () => {
+    if (googleSubmitting) return;
+    setFormError(undefined);
+    setGoogleSubmitting(true);
+    const result = await startGoogleSignIn(role);
+    if (!result.success) {
+      setFormError(result.error ?? 'Unable to start Google sign-in. Please try again.');
+      setGoogleSubmitting(false);
+    }
+  };
 
   const validate = (): boolean => {
     const nextErrors: FormErrors = {
@@ -192,6 +205,14 @@ export function SignUpPage() {
           Create Account
         </AuthButton>
       </form>
+
+      <div className="row gap-10" style={{ marginBottom: 18 }}>
+        <div style={{ flex: 1, height: 1, background: 'var(--ag-border-soft)' }} />
+        <span className="t-xs c-low">or continue with</span>
+        <div style={{ flex: 1, height: 1, background: 'var(--ag-border-soft)' }} />
+      </div>
+
+      <GoogleAuthButton loading={googleSubmitting} onClick={() => void handleGoogleSignIn()} />
 
       <p className="t-xs c-low auth-footnote">
         Already have an account?{' '}

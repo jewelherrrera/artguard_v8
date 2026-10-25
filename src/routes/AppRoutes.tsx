@@ -3,6 +3,7 @@ import { IonRouterOutlet } from '@ionic/react';
 import { SplashPage } from '../pages/SplashPage';
 import { GetStartedPage } from '../pages/GetStartedPage';
 import { LoginPage } from '../pages/LoginPage';
+import { AuthCallbackPage } from '../pages/AuthCallbackPage';
 import { SignUpPage } from '../pages/SignUpPage';
 import { ForgotPasswordPage } from '../pages/ForgotPasswordPage';
 import { ResetPasswordPage } from '../pages/ResetPasswordPage';
@@ -53,6 +54,7 @@ export function AppRoutes() {
       <Route path="/get-started" element={<GetStartedPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignUpPage />} />
+      <Route path="/auth/callback" element={<AuthCallbackPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
 

@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { Capacitor } from '@capacitor/core';
 import type { AuthResult, AuthUser, MockAccount, UserRole } from '../types/auth';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { getMyProfile, ensureMyProfile, usernameFromEmail } from '../lib/supabaseData';
@@ -14,7 +15,22 @@ const ACCOUNTS_KEY = 'artguard.mockAccounts';
 const SESSION_KEY = 'artguard.session';
 const MOCK_LATENCY_MS = 650;
 type ProfileUpdatePatch = Partial<Omit<AuthUser, 'isPro'>>;
-type AuthOperation = 'login' | 'signup';
+type AuthOperation = 'login' | 'signup' | 'oauth';
+type AuthenticatedDestination = '/home' | '/onboarding/name';
+const GOOGLE_SIGNUP_INTENT_KEY = 'artguard.googleSignupIntent';
+
+export interface GoogleSignupIntent {
+  role: UserRole;
+  startedAt: number;
+}
+
+function clearGoogleSignupIntent() {
+  try {
+    sessionStorage.removeItem(GOOGLE_SIGNUP_INTENT_KEY);
+  } catch {
+    // Session storage may be unavailable in restrictive browser modes.
+  }
+}
 
 interface AuthErrorMetadata {
   code?: string;
@@ -143,6 +159,8 @@ interface AuthContextValue {
   backendMode: 'supabase' | 'mock';
   login: (email: string, password: string) => Promise<AuthResult>;
   signUp: (name: string, email: string, password: string, role: UserRole) => Promise<AuthResult>;
+  startGoogleSignIn: (role?: UserRole) => Promise<AuthResult>;
+  completeGoogleSignIn: (intent?: GoogleSignupIntent) => Promise<AuthResult & { destination?: AuthenticatedDestination }>;
   changeEmail: (email: string) => Promise<AuthResult>;
   requestPasswordReset: (email: string) => Promise<AuthResult>;
   passwordRecoverySession: boolean;
@@ -457,6 +475,100 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [persistSession]);
 
+  const startGoogleSignIn = useCallback(async (role?: UserRole): Promise<AuthResult> => {
+    if (!isSupabaseConfigured || !supabase) {
+      return { success: false, error: 'Google sign-in requires a configured Supabase connection.' };
+    }
+    if (Capacitor.isNativePlatform()) {
+      return { success: false, error: 'Google sign-in on the native app is not configured yet. Please use the web app.' };
+    }
+
+    if (role) {
+      const intent: GoogleSignupIntent = { role, startedAt: Date.now() };
+      try {
+        sessionStorage.setItem(GOOGLE_SIGNUP_INTENT_KEY, JSON.stringify(intent));
+      } catch {
+        return { success: false, error: 'Unable to start Google sign-in. Please enable session storage and try again.' };
+      }
+    } else {
+      clearGoogleSignupIntent();
+    }
+
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: `${window.location.origin}/auth/callback` },
+      });
+      if (error) {
+        clearGoogleSignupIntent();
+        logAuthRequestFailure('oauth', error);
+        return { success: false, error: 'Unable to start Google sign-in. Please try again.' };
+      }
+      return { success: true };
+    } catch (error) {
+      clearGoogleSignupIntent();
+      logAuthRequestFailure('oauth', error);
+      return {
+        success: false,
+        error: error instanceof TypeError && /fetch|network/i.test(error.message)
+          ? 'Unable to connect. Check your connection and try again.'
+          : 'Unable to start Google sign-in. Please try again.',
+      };
+    }
+  }, []);
+
+  const completeGoogleSignIn = useCallback(async (
+    intent?: GoogleSignupIntent,
+  ): Promise<AuthResult & { destination?: AuthenticatedDestination }> => {
+    if (!isSupabaseConfigured || !supabase) {
+      return { success: false, error: 'Google sign-in requires a configured Supabase connection.' };
+    }
+
+    try {
+      const { data, error } = await supabase.auth.getUser();
+      if (error || !data.user) {
+        if (error) logAuthRequestFailure('oauth', error);
+        return { success: false, error: 'Unable to complete Google sign-in. Please try again.' };
+      }
+
+      const authUser = data.user;
+      const existingProfile = await getMyProfile(authUser.id);
+      const createdAt = Date.parse(authUser.created_at);
+      const isNewGoogleAccount = intent !== undefined
+        && Number.isFinite(createdAt)
+        && createdAt >= intent.startedAt;
+      const metadataRole = authUser.user_metadata?.role;
+      const role: UserRole = isNewGoogleAccount
+        ? intent.role
+        : metadataRole === 'artist' ? 'artist' : 'client';
+      const profile = existingProfile ?? await ensureMyProfile({
+        id: authUser.id,
+        name: String(authUser.user_metadata?.full_name ?? authUser.user_metadata?.name ?? authUser.email?.split('@')[0] ?? 'User'),
+        username: usernameFromEmail(authUser.email),
+        role,
+        onboarded: false,
+      });
+      if (!profile) {
+        return { success: false, error: 'Unable to set up your profile. Please try again.' };
+      }
+
+      const authenticatedUser = await publicUserFromSession(authUser);
+      persistSession(authenticatedUser);
+      return {
+        success: true,
+        destination: authenticatedUser.onboarded ? '/home' : '/onboarding/name',
+      };
+    } catch (error) {
+      logAuthRequestFailure('oauth', error);
+      return {
+        success: false,
+        error: error instanceof TypeError && /fetch|network/i.test(error.message)
+          ? 'Unable to connect. Check your connection and try again.'
+          : 'Unable to set up your profile. Please try again.',
+      };
+    }
+  }, [persistSession]);
+
   const requestPasswordReset = useCallback(async (email: string) => {
     if (!isSupabaseConfigured || !supabase) return mockApi.requestPasswordReset(email);
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/reset-password` });
@@ -546,6 +658,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       backendMode: isSupabaseConfigured ? 'supabase' : 'mock',
       login,
       signUp,
+      startGoogleSignIn,
+      completeGoogleSignIn,
       changeEmail,
       requestPasswordReset,
       passwordRecoverySession,
@@ -554,7 +668,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       enableMockPremium,
       logout,
     }),
-    [user, initializing, login, signUp, changeEmail, requestPasswordReset, passwordRecoverySession, clearPasswordRecoverySession, updateProfile, enableMockPremium, logout],
+    [user, initializing, login, signUp, startGoogleSignIn, completeGoogleSignIn, changeEmail, requestPasswordReset, passwordRecoverySession, clearPasswordRecoverySession, updateProfile, enableMockPremium, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
