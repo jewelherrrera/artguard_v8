@@ -702,12 +702,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const isIncompleteGoogleSignup = isNewGoogleAccount && !isCompletedProfile;
       if (isIncompleteGoogleSignup && profile.role !== role) {
         let roleUpdateError: { code?: string; status?: number; message?: string } | null = null;
+        let roleUpdated = false;
         try {
-          const result = await supabase
-            .from('profiles')
-            .update({ role })
-            .eq('id', authUser.id);
-          roleUpdateError = result.error;
+          const { data: updated, error } = await supabase.rpc('set_my_signup_role', {
+            p_role: role,
+          });
+          roleUpdateError = error;
+          roleUpdated = updated === true;
         } catch (error) {
           const { code, status } = getAuthErrorMetadata(error);
           console.warn('ArtGuard: Google signup role update failed.', {
@@ -718,6 +719,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return { success: false, error: 'Unable to save your selected account type. Please try again.' };
         }
         if (roleUpdateError) {
+          const { code, status } = getAuthErrorMetadata(roleUpdateError);
+          console.warn('ArtGuard: Google signup role update failed.', {
+            code: code ?? 'unknown',
+            status: status ?? null,
+            message: safeAuthErrorMessage(roleUpdateError),
+          });
+          return { success: false, error: 'Unable to save your selected account type. Please try again.' };
+        }
+        if (!roleUpdated) {
           let persistedProfile = null;
           try {
             persistedProfile = await getMyProfile(authUser.id);
@@ -732,16 +742,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (persistedProfile?.role === role) {
             profile = persistedProfile;
           } else {
-            const { code, status } = getAuthErrorMetadata(roleUpdateError);
-            console.warn('ArtGuard: Google signup role update failed.', {
-              code: code ?? 'unknown',
-              status: status ?? null,
-              message: safeAuthErrorMessage(roleUpdateError),
-            });
+            console.warn('ArtGuard: Google signup role update was rejected by the database guard.');
             return { success: false, error: 'Unable to save your selected account type. Please try again.' };
           }
         }
-        if (!roleUpdateError) {
+        if (roleUpdated) {
           try {
             const savedProfile = await getMyProfile(authUser.id);
             if (!savedProfile || savedProfile.role !== role) {
