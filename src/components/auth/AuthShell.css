@@ -128,7 +128,7 @@ ion-content.auth-viewport::part(background) {
     margin-bottom: 4px;
   }
 
-  .auth-card--split .auth-mark {
+  .auth-card--split .auth-brand {
     margin-bottom: 16px;
   }
 
@@ -207,32 +207,6 @@ ion-content.auth-viewport::part(background) {
   gap: 12px;
   max-width: 310px;
   margin: auto 42px 48px;
-}
-
-.auth-art-mark {
-  width: 54px;
-  height: 54px;
-  display: grid;
-  place-items: center;
-  margin-bottom: 8px;
-  border-radius: 16px;
-  background: var(--ag-grad-primary);
-  box-shadow: 0 12px 28px rgba(201, 147, 42, 0.32);
-}
-
-.auth-art-logo {
-  width: 29px;
-  height: 29px;
-  object-fit: contain;
-}
-
-.auth-art-kicker {
-  color: var(--ag-accent-soft);
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
 }
 
 .auth-art-copy strong {
@@ -346,6 +320,40 @@ ion-content.auth-viewport::part(background) {
   object-fit: contain;
 }
 
+.auth-brand {
+  display: flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 10px;
+  margin-bottom: 24px;
+  color: var(--ag-text-hi);
+  font-family: 'P22 Vincent', cursive;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+}
+
+.auth-brand-logo {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  object-fit: contain;
+}
+
+@media (max-width: 767px) {
+  .auth-brand {
+    gap: 8px;
+    font-size: 20px;
+  }
+
+  .auth-brand-logo {
+    width: 30px;
+    height: 30px;
+    flex-basis: 30px;
+  }
+}
+
 .auth-title {
   font-size: 28px;
   font-weight: 400;
@@ -353,6 +361,15 @@ ion-content.auth-viewport::part(background) {
   letter-spacing: 0.01em;
   margin-bottom: 6px;
   color: var(--ag-text-hi);
+}
+
+.auth-title--modern {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(25px, 3vw, 29px);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.16;
+  margin-bottom: 7px;
 }
 
 .auth-subtitle {

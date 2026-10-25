@@ -35,6 +35,7 @@ export function ForgotPasswordPage() {
 
   return (
     <AuthShell
+      brandHeader
       title="Reset your password"
       subtitle="Enter the email on your account and we'll send you a link to reset your password."
       markIcon="lock"

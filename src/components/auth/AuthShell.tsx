@@ -5,7 +5,9 @@ import { BrandMark } from '../ui/BrandMark';
 import './AuthShell.css';
 
 interface AuthShellProps {
-  /** Icon shown in the small rounded mark above the title (defaults to "shield"). */
+  /** Show the compact wordmark instead of the contextual screen icon. */
+  brandHeader?: boolean;
+  /** Icon shown above the title when `brandHeader` is not enabled. */
   markIcon?: Parameters<typeof Icon>[0]['name'];
   title: string;
   subtitle?: string;
@@ -16,10 +18,8 @@ interface AuthShellProps {
 
 /**
  * Shared frame for Login / Sign Up / Forgot Password.
- * Mirrors screen 02 of the mockup (icon mark, title, subtitle, scroll body)
- * while adding a back button slot used by every screen except the first.
  */
-export function AuthShell({ markIcon = 'shield', title, subtitle, onBack, authMode, children }: AuthShellProps) {
+export function AuthShell({ brandHeader = false, markIcon = 'shield', title, subtitle, onBack, authMode, children }: AuthShellProps) {
   return (
     <IonPage>
       {/* Native scrolling (scrollY defaults to true) so the card can never be
@@ -36,10 +36,6 @@ export function AuthShell({ markIcon = 'shield', title, subtitle, onBack, authMo
                 <div className="auth-art-orbit auth-art-orbit-two" />
                 <div className="auth-art-stars" />
                 <div className="auth-art-copy">
-                  <div className="auth-art-mark">
-                    <BrandMark variant="navy" className="auth-art-logo" />
-                  </div>
-                  <span className="auth-art-kicker">ArtGuard Hub</span>
                   <strong>Make room for the work that matters.</strong>
                   <span>Discover, connect, and create with confidence.</span>
                 </div>
@@ -55,15 +51,22 @@ export function AuthShell({ markIcon = 'shield', title, subtitle, onBack, authMo
                 )}
               </div>
 
-              <div className="auth-mark">
-                {markIcon === 'shield' ? (
-                  <BrandMark themed={{ light: 'navy', dark: 'yellow' }} className="auth-mark-logo" />
-                ) : (
-                  <Icon name={markIcon} />
-                )}
-              </div>
+              {brandHeader ? (
+                <div className="auth-brand">
+                  <BrandMark themed={{ light: 'navy', dark: 'yellow' }} className="auth-brand-logo" alt="" />
+                  <span>ArtGuard Hub</span>
+                </div>
+              ) : (
+                <div className="auth-mark">
+                  {markIcon === 'shield' ? (
+                    <BrandMark themed={{ light: 'navy', dark: 'yellow' }} className="auth-mark-logo" />
+                  ) : (
+                    <Icon name={markIcon} />
+                  )}
+                </div>
+              )}
 
-              <h2 className="auth-title">{title}</h2>
+              <h2 className={`auth-title${brandHeader ? ' auth-title--modern' : ''}`}>{title}</h2>
               {subtitle && <p className="auth-subtitle">{subtitle}</p>}
 
               {children}

@@ -11,7 +11,6 @@ import type { UserRole } from '../types/auth';
 import {
   assessPassword,
   validateConfirmPassword,
-  validateBirthdayField,
   validateEmailField,
   validatePasswordField,
   validateRequired,
@@ -24,7 +23,6 @@ import './SignUpPage.css';
 
 interface FormErrors {
   name?: string;
-  birthday?: string;
   email?: string;
   password?: string;
   confirmPassword?: string;
@@ -36,7 +34,6 @@ export function SignUpPage() {
 
   const [role, setRole] = useState<UserRole>('artist');
   const [name, setName] = useState('');
-  const [birthday, setBirthday] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -45,15 +42,9 @@ export function SignUpPage() {
   const [formError, setFormError] = useState<string | undefined>();
   const passwordAssessment = assessPassword(password);
 
-  const today = new Date();
-  const maxBirthday = `${today.getFullYear().toString().padStart(4, '0')}-${(today.getMonth() + 1)
-    .toString()
-    .padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
-
   const validate = (): boolean => {
     const nextErrors: FormErrors = {
       name: validateRequired(name, 'Name'),
-      birthday: validateBirthdayField(birthday),
       email: validateEmailField(email),
       password: validatePasswordField(password),
       confirmPassword: validateConfirmPassword(password, confirmPassword),
@@ -71,10 +62,12 @@ export function SignUpPage() {
     logAuthInteractionDiagnostic('signup.started', { destination: '/onboarding/name' });
     let result: Awaited<ReturnType<typeof signUp>>;
     try {
-      result = await signUp(name, email, password, role, birthday);
-    } catch (error) {
+      result = await signUp(name, email, password, role);
+    } catch {
       logAuthInteractionDiagnostic('signup.failed', { success: false });
-      throw error;
+      setSubmitting(false);
+      setFormError('Unable to create your account right now. Please try again.');
+      return;
     }
     setSubmitting(false);
 
@@ -91,13 +84,13 @@ export function SignUpPage() {
   return (
     <AuthShell
       authMode="signup"
+      brandHeader
       title="Create your account"
-      subtitle="Join ArtGuard Hub to start protecting and managing commissions."
-      markIcon="user"
+      subtitle="Join artists and clients building safer creative projects."
       onBack={() => navigate('/login')}
     >
       {formError && (
-        <div className="auth-banner error">
+        <div className="auth-banner error" role="alert">
           <Icon name="alert" style={{ stroke: 'var(--ag-danger)' }} />
           <span>{formError}</span>
         </div>
@@ -117,21 +110,6 @@ export function SignUpPage() {
           autoComplete="name"
           name="name"
           error={errors.name}
-        />
-        <AuthInput
-          label="Birthday"
-          icon="calendar"
-          type="date"
-          value={birthday}
-          onChange={(v) => {
-            setBirthday(v);
-            if (errors.birthday) setErrors((prev) => ({ ...prev, birthday: undefined }));
-          }}
-          autoComplete="bday"
-          name="birthday"
-          error={errors.birthday}
-          required
-          max={maxBirthday}
         />
         <AuthInput
           label="Email address"

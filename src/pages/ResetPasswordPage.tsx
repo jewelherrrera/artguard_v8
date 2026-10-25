@@ -100,6 +100,7 @@ export function ResetPasswordPage() {
 
   return (
     <AuthShell
+      brandHeader
       title="Reset Password"
       subtitle="Choose a new password for your account."
       markIcon="lock"

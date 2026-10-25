@@ -14,6 +14,57 @@ const ACCOUNTS_KEY = 'artguard.mockAccounts';
 const SESSION_KEY = 'artguard.session';
 const MOCK_LATENCY_MS = 650;
 type ProfileUpdatePatch = Partial<Omit<AuthUser, 'isPro'>>;
+type AuthOperation = 'login' | 'signup';
+
+interface AuthErrorMetadata {
+  code?: string;
+  name?: string;
+  status?: number;
+}
+
+function getAuthErrorMetadata(error: unknown): AuthErrorMetadata {
+  if (typeof error !== 'object' || error === null) return {};
+  const value = error as Record<string, unknown>;
+  return {
+    ...(typeof value.code === 'string' ? { code: value.code.toLowerCase() } : {}),
+    ...(typeof value.name === 'string' ? { name: value.name } : {}),
+    ...(typeof value.status === 'number' ? { status: value.status } : {}),
+  };
+}
+
+function logAuthRequestFailure(operation: AuthOperation, error: unknown) {
+  const { code, status } = getAuthErrorMetadata(error);
+  console.warn('ArtGuard: authentication request failed.', {
+    operation,
+    code: code ?? 'unknown',
+    status: status ?? null,
+  });
+}
+
+function getAuthErrorMessage(error: unknown, operation: AuthOperation): string {
+  const { code, name, status } = getAuthErrorMetadata(error);
+
+  if (operation === 'login' && code === 'invalid_credentials') return 'Invalid email or password.';
+  if (operation === 'login' && code === 'email_not_confirmed') {
+    return 'Please confirm your email before signing in.';
+  }
+  if (operation === 'signup' && ['email_exists', 'user_already_exists', 'user_already_registered'].includes(code ?? '')) {
+    return 'An account with this email may already exist. Try signing in or resetting your password.';
+  }
+  if (status === 429 || ['over_request_rate_limit', 'over_email_send_rate_limit', 'rate_limit_exceeded', 'too_many_requests'].includes(code ?? '')) {
+    return 'Too many attempts. Please wait a little before trying again.';
+  }
+  if (
+    code === 'network_error' ||
+    name === 'AuthRetryableFetchError' ||
+    (error instanceof TypeError && /fetch|network/i.test(error.message))
+  ) {
+    return 'Unable to connect. Check your connection and try again.';
+  }
+  return operation === 'login'
+    ? 'Unable to sign in right now. Please try again.'
+    : 'Unable to create your account right now. Please try again.';
+}
 
 function delay<T>(value: T, ms = MOCK_LATENCY_MS): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(value), ms));
@@ -43,7 +94,6 @@ const mockApi = {
     email: string,
     password: string,
     role: UserRole,
-    dateOfBirth: string,
   ): Promise<AuthResult & { user?: AuthUser }> {
     const accounts = readAccounts();
     const normalizedEmail = email.trim().toLowerCase();
@@ -57,7 +107,6 @@ const mockApi = {
       username: usernameFromEmail(normalizedEmail),
       role,
       createdAt: new Date().toISOString(),
-      dateOfBirth,
       password,
     };
     writeAccounts([...accounts, account]);
@@ -93,7 +142,7 @@ interface AuthContextValue {
   initializing: boolean;
   backendMode: 'supabase' | 'mock';
   login: (email: string, password: string) => Promise<AuthResult>;
-  signUp: (name: string, email: string, password: string, role: UserRole, dateOfBirth: string) => Promise<AuthResult>;
+  signUp: (name: string, email: string, password: string, role: UserRole) => Promise<AuthResult>;
   changeEmail: (email: string) => Promise<AuthResult>;
   requestPasswordReset: (email: string) => Promise<AuthResult>;
   passwordRecoverySession: boolean;
@@ -313,12 +362,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!isSupabaseConfigured || !supabase) {
       const result = await mockApi.login(email, password);
       if (result.success && result.user) persistSession(result.user);
-      return { success: result.success, error: result.error };
+      const error = result.error === 'No account found with that email.'
+        ? "This account doesn't exist. Create an account first."
+        : result.error;
+      return { success: result.success, error };
     }
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-      if (error || !data.user) return { success: false, error: error?.message ?? 'Unable to sign in.' };
+      if (error) {
+        logAuthRequestFailure('login', error);
+        return { success: false, error: getAuthErrorMessage(error, 'login') };
+      }
+      if (!data.user) return { success: false, error: 'Unable to sign in right now. Please try again.' };
       const fallbackUser = await publicUserFromSession(data.user);
       try {
         await ensureMyProfile({
@@ -334,32 +390,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       persistSession(fallbackUser);
       return { success: true };
     } catch (error) {
-      const message = error instanceof TypeError && /fetch/i.test(error.message)
-        ? 'Could not reach Supabase. Check your VITE_SUPABASE_URL, Publishable Key, internet connection, and restart the Vite server.'
-        : error instanceof Error ? error.message : 'Unable to sign in.';
-      return { success: false, error: message };
+      logAuthRequestFailure('login', error);
+      return { success: false, error: getAuthErrorMessage(error, 'login') };
     }
   }, [persistSession]);
 
-  const signUp = useCallback(async (name: string, email: string, password: string, role: UserRole, dateOfBirth: string) => {
+  const signUp = useCallback(async (name: string, email: string, password: string, role: UserRole) => {
     const passwordError = validatePasswordField(password);
     if (passwordError) return { success: false, error: passwordError };
 
     if (!isSupabaseConfigured || !supabase) {
-      const result = await mockApi.signUp(name, email, password, role, dateOfBirth);
+      const result = await mockApi.signUp(name, email, password, role);
       if (result.success && result.user) persistSession(result.user);
-      return { success: result.success, error: result.error };
+      const error = result.error === 'An account with that email already exists.'
+        ? 'An account with this email may already exist. Try signing in or resetting your password.'
+        : result.error;
+      return { success: result.success, error };
     }
 
     try {
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
-        options: { data: { name: name.trim(), role, onboarded: false, date_of_birth: dateOfBirth } },
+        options: { data: { name: name.trim(), role, onboarded: false } },
       });
-      if (error) return { success: false, error: error.message };
+      if (error) {
+        logAuthRequestFailure('signup', error);
+        return { success: false, error: getAuthErrorMessage(error, 'signup') };
+      }
       if (!data.user || !data.session) {
-        return { success: false, error: 'Account created. Check your email to confirm your account, then log in.' };
+        return {
+          success: false,
+          error: "Check your email for confirmation instructions. If you don't receive one, try signing in or resetting your password.",
+        };
       }
       let fallbackUser = await publicUserFromSession(data.user);
       try {
@@ -389,10 +452,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       void refreshProfileForUser(data.user.id, fallbackUser).then(persistSession);
       return { success: true };
     } catch (error) {
-      const message = error instanceof TypeError && /fetch/i.test(error.message)
-        ? 'Could not reach Supabase. Check your VITE_SUPABASE_URL, Publishable Key, internet connection, and restart the Vite server.'
-        : error instanceof Error ? error.message : 'Unable to create account.';
-      return { success: false, error: message };
+      logAuthRequestFailure('signup', error);
+      return { success: false, error: getAuthErrorMessage(error, 'signup') };
     }
   }, [persistSession]);
 
