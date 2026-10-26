@@ -21,6 +21,73 @@ function allowedOrigins(): Set<string> {
   return new Set([...LOCAL_ORIGINS, ...configuredOrigins]);
 }
 
+function safeEmailLinkErrorDetails(error: unknown): {
+  name?: string;
+  code?: string;
+  status?: number;
+  message: string;
+} {
+  if (typeof error !== 'object' || error === null) {
+    return { message: 'Email-link request failed.' };
+  }
+  const details = error as Record<string, unknown>;
+  const safeErrorNames = new Set([
+    'AuthApiError',
+    'AuthError',
+    'AuthRetryableFetchError',
+    'TypeError',
+    'Error',
+  ]);
+  const safeErrorCodes = new Set([
+    'email_address_invalid',
+    'email_provider_disabled',
+    'over_email_send_rate_limit',
+    'over_request_rate_limit',
+    'redirect_to_not_allowed',
+    'smtp_error',
+    'unexpected_failure',
+    'validation_failed',
+  ]);
+  const name = typeof details.name === 'string' && safeErrorNames.has(details.name)
+    ? details.name
+    : undefined;
+  const code = typeof details.code === 'string' && safeErrorCodes.has(details.code)
+    ? details.code
+    : undefined;
+  const status = typeof details.status === 'number' && Number.isInteger(details.status)
+    ? details.status
+    : undefined;
+  return {
+    ...(name ? { name } : {}),
+    ...(code ? { code } : {}),
+    ...(status !== undefined ? { status } : {}),
+    message: 'Supabase email-link request failed.',
+  };
+}
+
+function emailLinkFailureResponse(error: unknown, origin: string): Response {
+  const details = safeEmailLinkErrorDetails(error);
+  const rawCode = typeof error === 'object' && error !== null
+    && 'code' in error && typeof error.code === 'string'
+    ? error.code.toLowerCase()
+    : '';
+  const code = details.status === 429 || rawCode.includes('rate_limit')
+    ? 'email_rate_limited'
+    : rawCode.includes('redirect')
+      ? 'email_redirect_rejected'
+      : rawCode.includes('provider') || rawCode.includes('smtp')
+        ? 'email_provider_unavailable'
+        : details.status && details.status >= 400 && details.status < 500
+          ? 'email_link_request_rejected'
+          : 'email_link_request_failed';
+  const status = code === 'email_rate_limited' ? 429 : 503;
+  console.error('google-login-existing: Email-link request failed.', {
+    stage: code,
+    ...details,
+  });
+  return jsonResponse({ error: 'Unable to send the sign-in email.', code }, status, origin);
+}
+
 function jsonResponse(
   body: Record<string, string>,
   status: number,
@@ -415,16 +482,28 @@ Deno.serve(async (request: Request) => {
       },
     });
     const emailRedirectTo = `${origin}/auth/callback?flow=existing-google-login`;
-    const { error: otpError } = await emailAuth.auth.signInWithOtp({
-      email: user.email,
-      options: {
-        shouldCreateUser: false,
-        emailRedirectTo,
-      },
+    console.info('google-login-existing: Requesting existing-user email link.', {
+      stage: 'email_link_request_started',
     });
-    if (otpError) {
-      return jsonResponse({ error: 'Unable to send the sign-in email.' }, 503, origin);
+    let otpResult: Awaited<ReturnType<typeof emailAuth.auth.signInWithOtp>>;
+    try {
+      otpResult = await emailAuth.auth.signInWithOtp({
+        email: user.email,
+        options: {
+          shouldCreateUser: false,
+          emailRedirectTo,
+        },
+      });
+    } catch (error) {
+      return emailLinkFailureResponse(error, origin);
     }
+    const { error: otpError } = otpResult;
+    if (otpError) {
+      return emailLinkFailureResponse(otpError, origin);
+    }
+    console.info('google-login-existing: Existing-user email link request accepted.', {
+      stage: 'email_link_request_succeeded',
+    });
 
     let stillExistingUser: Awaited<ReturnType<typeof findExistingGoogleUser>>;
     try {
