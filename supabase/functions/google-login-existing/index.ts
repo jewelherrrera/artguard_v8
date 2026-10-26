@@ -98,56 +98,187 @@ async function verifiedAudienceFingerprints(audience: unknown): Promise<string[]
   return Promise.all(audiences.map(fingerprint));
 }
 
-function findGoogleIdentity(identity: {
+type AdminIdentityShape = {
   id?: string;
+  identity_id?: string;
+  identity_data?: Record<string, unknown>;
   provider?: string;
   provider_id?: string;
-}, subject: string): boolean {
+};
+
+function providerAccountId(identity: AdminIdentityShape): string | undefined {
   // GoTrue's Admin JSON maps its provider_id value to id; identity_id is the row UUID.
-  return identity.provider === 'google'
-    && (identity.provider_id ?? identity.id) === subject;
+  if (typeof identity.provider_id === 'string') return identity.provider_id;
+  return typeof identity.id === 'string' ? identity.id : undefined;
 }
 
-async function logGoogleIdentityShape(
-  identity: {
-    id?: string;
-    identity_id?: string;
-    identity_data?: Record<string, unknown>;
-    provider_id?: string;
-  },
-  subject: string,
-): Promise<void> {
-  const identityDataSubject = identity.identity_data?.sub;
-  const [subjectFingerprint, idFingerprint, identityIdFingerprint, providerIdFingerprint, identityDataSubjectFingerprint] =
-    await Promise.all([
-      fingerprint(subject),
-      typeof identity.id === 'string' ? fingerprint(identity.id) : Promise.resolve(null),
-      typeof identity.identity_id === 'string' ? fingerprint(identity.identity_id) : Promise.resolve(null),
-      typeof identity.provider_id === 'string' ? fingerprint(identity.provider_id) : Promise.resolve(null),
-      typeof identityDataSubject === 'string'
-        ? fingerprint(identityDataSubject)
-        : Promise.resolve(null),
-    ]);
+function findGoogleIdentity(identity: AdminIdentityShape, subject: string): boolean {
+  return identity.provider === 'google' && providerAccountId(identity) === subject;
+}
 
-  console.info('google-login-existing: Google identity shape diagnostic.', {
-    stage: 'google_identity_shape_diagnostic',
-    identityFieldNames: Object.keys(identity).sort(),
-    identityDataFieldNames: identity.identity_data
-      ? Object.keys(identity.identity_data).sort()
-      : [],
+type FingerprintMatch = {
+  fingerprint: string;
+  matchesVerifiedSubject: boolean;
+};
+
+type GoogleIdentityDiagnostics = {
+  verifiedSubjectFingerprint: string;
+  pagesScanned: number;
+  usersScanned: number;
+  usersWithIdentitiesArray: number;
+  usersWithoutIdentitiesArray: number;
+  googleIdentitiesObserved: number;
+  identityShapes: Map<string, { fields: string[]; count: number }>;
+  failedPage?: number;
+  candidateFieldPresence: {
+    provider: number;
+    id: number;
+    identity_id: number;
+    provider_id: number;
+    identity_data_sub: number;
+  };
+  authoritativeComparisons: Map<string, {
+    field: 'id' | 'provider_id';
+    fingerprint: string;
+    matched: boolean;
+  }>;
+  candidateFingerprints: {
+    id: Map<string, FingerprintMatch>;
+    provider_id: Map<string, FingerprintMatch>;
+    identity_data_sub: Map<string, FingerprintMatch>;
+  };
+};
+
+async function createGoogleIdentityDiagnostics(
+  subject: string,
+): Promise<GoogleIdentityDiagnostics> {
+  return {
+    verifiedSubjectFingerprint: await fingerprint(subject),
+    pagesScanned: 0,
+    usersScanned: 0,
+    usersWithIdentitiesArray: 0,
+    usersWithoutIdentitiesArray: 0,
+    googleIdentitiesObserved: 0,
+    identityShapes: new Map(),
     candidateFieldPresence: {
-      provider_is_google: identity.provider === 'google',
-      id: typeof identity.id === 'string',
-      identity_id: typeof identity.identity_id === 'string',
-      provider_id: typeof identity.provider_id === 'string',
-      identity_data_sub: typeof identityDataSubject === 'string',
+      provider: 0,
+      id: 0,
+      identity_id: 0,
+      provider_id: 0,
+      identity_data_sub: 0,
     },
+    authoritativeComparisons: new Map(),
     candidateFingerprints: {
-      verifiedSubject: subjectFingerprint,
-      id: idFingerprint,
-      identity_id: identityIdFingerprint,
-      provider_id: providerIdFingerprint,
-      identity_data_sub: identityDataSubjectFingerprint,
+      id: new Map(),
+      provider_id: new Map(),
+      identity_data_sub: new Map(),
+    },
+  };
+}
+
+function countShape(shapes: Map<string, { fields: string[]; count: number }>, fields: string[]): void {
+  const sortedFields = [...fields].sort();
+  const key = JSON.stringify(sortedFields);
+  const shape = shapes.get(key);
+  if (shape) {
+    shape.count += 1;
+  } else {
+    shapes.set(key, { fields: sortedFields, count: 1 });
+  }
+}
+
+async function recordCandidateFingerprint(
+  field: keyof GoogleIdentityDiagnostics['candidateFingerprints'],
+  value: unknown,
+  subject: string,
+  diagnostics: GoogleIdentityDiagnostics,
+): Promise<void> {
+  if (typeof value !== 'string') return;
+
+  const valueFingerprint = await fingerprint(value);
+  const matchesVerifiedSubject = value === subject;
+  const fingerprintKey = `${valueFingerprint}:${matchesVerifiedSubject}`;
+  if (!diagnostics.candidateFingerprints[field].has(fingerprintKey)) {
+    diagnostics.candidateFingerprints[field].set(fingerprintKey, {
+      fingerprint: valueFingerprint,
+      matchesVerifiedSubject,
+    });
+  }
+}
+
+async function recordGoogleIdentityDiagnostic(
+  identity: AdminIdentityShape,
+  subject: string,
+  diagnostics: GoogleIdentityDiagnostics,
+): Promise<void> {
+  diagnostics.googleIdentitiesObserved += 1;
+  const knownIdentityFields = ['provider', 'id', 'identity_id', 'provider_id', 'identity_data'];
+  countShape(
+    diagnostics.identityShapes,
+    Object.keys(identity).filter((field) => knownIdentityFields.includes(field)),
+  );
+
+  const identityDataSubject = identity.identity_data?.sub;
+  if (typeof identity.provider === 'string') diagnostics.candidateFieldPresence.provider += 1;
+  if (typeof identity.id === 'string') diagnostics.candidateFieldPresence.id += 1;
+  if (typeof identity.identity_id === 'string') diagnostics.candidateFieldPresence.identity_id += 1;
+  if (typeof identity.provider_id === 'string') diagnostics.candidateFieldPresence.provider_id += 1;
+  if (typeof identityDataSubject === 'string') {
+    diagnostics.candidateFieldPresence.identity_data_sub += 1;
+  }
+
+  await Promise.all([
+    recordCandidateFingerprint('id', identity.id, subject, diagnostics),
+    recordCandidateFingerprint('provider_id', identity.provider_id, subject, diagnostics),
+    recordCandidateFingerprint('identity_data_sub', identityDataSubject, subject, diagnostics),
+  ]);
+
+  const authoritativeField = typeof identity.provider_id === 'string' ? 'provider_id' : 'id';
+  const authoritativeValue = providerAccountId(identity);
+  if (authoritativeValue !== undefined) {
+    const valueFingerprint = await fingerprint(authoritativeValue);
+    const matched = authoritativeValue === subject;
+    const comparisonKey = `${authoritativeField}:${valueFingerprint}:${matched}`;
+    diagnostics.authoritativeComparisons.set(comparisonKey, {
+      field: authoritativeField,
+      fingerprint: valueFingerprint,
+      matched,
+    });
+  }
+}
+
+function logGoogleIdentityDiagnostics(
+  diagnostics: GoogleIdentityDiagnostics,
+  outcome: 'match_found' | 'no_match' | 'auth_admin_error',
+): void {
+  const candidates = (field: keyof GoogleIdentityDiagnostics['candidateFingerprints']) =>
+    [...diagnostics.candidateFingerprints[field].values()];
+
+  console.info('google-login-existing: Google identity scan diagnostic.', {
+    stage: 'google_identity_scan_diagnostic',
+    outcome,
+    pagesScanned: diagnostics.pagesScanned,
+    usersScanned: diagnostics.usersScanned,
+    usersWithIdentitiesArray: diagnostics.usersWithIdentitiesArray,
+    usersWithoutIdentitiesArray: diagnostics.usersWithoutIdentitiesArray,
+    googleIdentitiesObserved: diagnostics.googleIdentitiesObserved,
+    identityShapes: [...diagnostics.identityShapes.values()],
+    failedPage: diagnostics.failedPage,
+    candidateFieldPresence: diagnostics.candidateFieldPresence,
+    verifiedSubjectFingerprint: diagnostics.verifiedSubjectFingerprint,
+    candidateFingerprints: {
+      id: candidates('id'),
+      provider_id: candidates('provider_id'),
+      identity_data_sub: candidates('identity_data_sub').map((candidate) => ({
+        ...candidate,
+        diagnosticOnly: true,
+      })),
+    },
+    authoritativeComparisons: [...diagnostics.authoritativeComparisons.values()],
+    authoritativeComparison: {
+      field: 'provider_id_or_go_true_wire_id',
+      matched: [...diagnostics.authoritativeComparisons.values()]
+        .some((candidate) => candidate.matched),
     },
   });
 }
@@ -155,25 +286,54 @@ async function logGoogleIdentityShape(
 async function findExistingGoogleUser(
   admin: ReturnType<typeof createClient>,
   subject: string,
+  emitDiagnostics = false,
 ) {
-  let loggedIdentityShape = false;
+  const diagnostics = emitDiagnostics
+    ? await createGoogleIdentityDiagnostics(subject)
+    : null;
+  let outcome: 'match_found' | 'no_match' | 'auth_admin_error' = 'no_match';
   for (let page = 1; ; page += 1) {
-    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: PAGE_SIZE });
-    if (error) {
+    let result: Awaited<ReturnType<typeof admin.auth.admin.listUsers>>;
+    try {
+      result = await admin.auth.admin.listUsers({ page, perPage: PAGE_SIZE });
+    } catch {
+      outcome = 'auth_admin_error';
+      if (diagnostics) diagnostics.failedPage = page;
       console.error('google-login-existing: Auth Admin API request failed.', {
         stage: 'auth_admin_list_users_error',
         page,
       });
+      if (diagnostics) logGoogleIdentityDiagnostics(diagnostics, outcome);
+      throw new Error('Auth Admin API request failed.');
+    }
+    const { data, error } = result;
+    if (error) {
+      outcome = 'auth_admin_error';
+      if (diagnostics) diagnostics.failedPage = page;
+      console.error('google-login-existing: Auth Admin API request failed.', {
+        stage: 'auth_admin_list_users_error',
+        page,
+      });
+      if (diagnostics) {
+        logGoogleIdentityDiagnostics(diagnostics, outcome);
+      }
       throw error;
+    }
+    if (diagnostics) {
+      diagnostics.pagesScanned += 1;
     }
 
     let match: (typeof data.users)[number] | undefined;
     for (const user of data.users) {
+      if (diagnostics) {
+        diagnostics.usersScanned += 1;
+        if (Array.isArray(user.identities)) diagnostics.usersWithIdentitiesArray += 1;
+        else diagnostics.usersWithoutIdentitiesArray += 1;
+      }
       for (const identity of user.identities ?? []) {
         if (identity.provider !== 'google') continue;
-        if (!loggedIdentityShape) {
-          await logGoogleIdentityShape(identity, subject);
-          loggedIdentityShape = true;
+        if (diagnostics) {
+          await recordGoogleIdentityDiagnostic(identity, subject, diagnostics);
         }
         if (findGoogleIdentity(identity, subject)) {
           match = user;
@@ -183,15 +343,18 @@ async function findExistingGoogleUser(
       if (match) break;
     }
     if (match) {
+      outcome = 'match_found';
       console.info('google-login-existing: Google identity match found.', {
         stage: 'google_identity_match_found',
       });
+      if (diagnostics) logGoogleIdentityDiagnostics(diagnostics, outcome);
       return match;
     }
     if (data.users.length < PAGE_SIZE) {
       console.info('google-login-existing: Google identity match not found.', {
         stage: 'google_identity_match_not_found',
       });
+      if (diagnostics) logGoogleIdentityDiagnostics(diagnostics, outcome);
       return null;
     }
   }
@@ -353,7 +516,7 @@ Deno.serve(async (request: Request) => {
     });
     let user: Awaited<ReturnType<typeof findExistingGoogleUser>>;
     try {
-      user = await findExistingGoogleUser(admin, subject);
+      user = await findExistingGoogleUser(admin, subject, true);
     } catch {
       return jsonResponse({ error: 'Unable to complete Google sign-in.' }, 500, origin);
     }
