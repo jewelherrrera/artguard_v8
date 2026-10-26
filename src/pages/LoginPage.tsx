@@ -111,7 +111,7 @@ export function LoginPage() {
         </div>
       )}
       {googleEmailSent && (
-        <div className="auth-banner" role="status" style={{ marginBottom: 16 }}>
+        <div className="auth-banner success" role="status" style={{ marginBottom: 16 }}>
           <span>Check your email to finish signing in. The secure sign-in link will take you back to ArtGuard Hub.</span>
         </div>
       )}
