@@ -98,35 +98,141 @@ async function verifiedAudienceFingerprints(audience: unknown): Promise<string[]
   return Promise.all(audiences.map(fingerprint));
 }
 
-function findGoogleIdentity(user: {
-  identities?: Array<{
-    id?: string;
-    provider?: string;
-    identity_data?: Record<string, unknown>;
-  }> | null;
+function findGoogleIdentity(identity: {
+  id?: string;
+  provider?: string;
+  provider_id?: string;
 }, subject: string): boolean {
-  return Boolean(user.identities?.some((identity) =>
-    identity.provider === 'google'
-    && (identity.id === subject || identity.identity_data?.sub === subject)
-  ));
+  // GoTrue's Admin JSON maps its provider_id value to id; identity_id is the row UUID.
+  return identity.provider === 'google'
+    && (identity.provider_id ?? identity.id) === subject;
+}
+
+async function logGoogleIdentityShape(
+  identity: {
+    id?: string;
+    identity_id?: string;
+    identity_data?: Record<string, unknown>;
+    provider_id?: string;
+  },
+  subject: string,
+): Promise<void> {
+  const identityDataSubject = identity.identity_data?.sub;
+  const [subjectFingerprint, idFingerprint, identityIdFingerprint, providerIdFingerprint, identityDataSubjectFingerprint] =
+    await Promise.all([
+      fingerprint(subject),
+      typeof identity.id === 'string' ? fingerprint(identity.id) : Promise.resolve(null),
+      typeof identity.identity_id === 'string' ? fingerprint(identity.identity_id) : Promise.resolve(null),
+      typeof identity.provider_id === 'string' ? fingerprint(identity.provider_id) : Promise.resolve(null),
+      typeof identityDataSubject === 'string'
+        ? fingerprint(identityDataSubject)
+        : Promise.resolve(null),
+    ]);
+
+  console.info('google-login-existing: Google identity shape diagnostic.', {
+    stage: 'google_identity_shape_diagnostic',
+    identityFieldNames: Object.keys(identity).sort(),
+    identityDataFieldNames: identity.identity_data
+      ? Object.keys(identity.identity_data).sort()
+      : [],
+    candidateFieldPresence: {
+      provider_is_google: identity.provider === 'google',
+      id: typeof identity.id === 'string',
+      identity_id: typeof identity.identity_id === 'string',
+      provider_id: typeof identity.provider_id === 'string',
+      identity_data_sub: typeof identityDataSubject === 'string',
+    },
+    candidateFingerprints: {
+      verifiedSubject: subjectFingerprint,
+      id: idFingerprint,
+      identity_id: identityIdFingerprint,
+      provider_id: providerIdFingerprint,
+      identity_data_sub: identityDataSubjectFingerprint,
+    },
+  });
 }
 
 async function findExistingGoogleUser(
   admin: ReturnType<typeof createClient>,
-  email: string,
   subject: string,
 ) {
+  let loggedIdentityShape = false;
   for (let page = 1; ; page += 1) {
     const { data, error } = await admin.auth.admin.listUsers({ page, perPage: PAGE_SIZE });
-    if (error) throw error;
+    if (error) {
+      console.error('google-login-existing: Auth Admin API request failed.', {
+        stage: 'auth_admin_list_users_error',
+        page,
+      });
+      throw error;
+    }
 
-    const match = data.users.find((user) =>
-      user.email?.trim().toLowerCase() === email
-      && findGoogleIdentity(user, subject)
-    );
-    if (match) return match;
-    if (data.users.length < PAGE_SIZE) return null;
+    let match: (typeof data.users)[number] | undefined;
+    for (const user of data.users) {
+      for (const identity of user.identities ?? []) {
+        if (identity.provider !== 'google') continue;
+        if (!loggedIdentityShape) {
+          await logGoogleIdentityShape(identity, subject);
+          loggedIdentityShape = true;
+        }
+        if (findGoogleIdentity(identity, subject)) {
+          match = user;
+          break;
+        }
+      }
+      if (match) break;
+    }
+    if (match) {
+      console.info('google-login-existing: Google identity match found.', {
+        stage: 'google_identity_match_found',
+      });
+      return match;
+    }
+    if (data.users.length < PAGE_SIZE) {
+      console.info('google-login-existing: Google identity match not found.', {
+        stage: 'google_identity_match_not_found',
+      });
+      return null;
+    }
   }
+}
+
+async function findProfile(
+  admin: ReturnType<typeof createClient>,
+  userId: string,
+): Promise<{ id: string; role: string } | null> {
+  const { data, error } = await admin
+    .from('profiles')
+    .select('id, role')
+    .eq('id', userId)
+    .maybeSingle();
+  if (error) {
+    console.error('google-login-existing: Profile query failed.', {
+      stage: 'profile_query_error',
+    });
+    throw error;
+  }
+
+  if (!data) {
+    console.info('google-login-existing: Profile row not found.', {
+      stage: 'profile_row_not_found',
+    });
+    return null;
+  }
+  console.info('google-login-existing: Profile row found.', {
+    stage: 'profile_row_found',
+  });
+
+  if (data.role !== 'artist' && data.role !== 'client') {
+    console.warn('google-login-existing: Profile role is invalid.', {
+      stage: 'profile_role_invalid',
+    });
+    return data;
+  }
+  console.info('google-login-existing: Profile role is valid.', {
+    stage: 'profile_role_valid',
+  });
+  return data;
 }
 
 Deno.serve(async (request: Request) => {
@@ -234,6 +340,9 @@ Deno.serve(async (request: Request) => {
       console.warn('google-login-existing: credential rejected.', { stage: 'email_not_verified' });
       return jsonResponse({ error: 'Invalid Google credential.', code: 'email_not_verified' }, 401, origin);
     }
+    console.info('google-login-existing: Google token verified.', {
+      stage: 'google_token_verified',
+    });
 
     const admin = createClient(supabaseUrl, serviceRoleKey, {
       auth: {
@@ -244,9 +353,9 @@ Deno.serve(async (request: Request) => {
     });
     let user: Awaited<ReturnType<typeof findExistingGoogleUser>>;
     try {
-      user = await findExistingGoogleUser(admin, email, subject);
+      user = await findExistingGoogleUser(admin, subject);
     } catch {
-      return jsonResponse({ code: 'account_not_found' }, 404, origin);
+      return jsonResponse({ error: 'Unable to complete Google sign-in.' }, 500, origin);
     }
     if (!user || !user.email) {
       return jsonResponse({ code: 'account_not_found' }, 404, origin);
@@ -254,15 +363,9 @@ Deno.serve(async (request: Request) => {
 
     let profile: { id: string; role: string } | null;
     try {
-      const result = await admin
-        .from('profiles')
-        .select('id, role')
-        .eq('id', user.id)
-        .maybeSingle();
-      if (result.error) throw result.error;
-      profile = result.data;
+      profile = await findProfile(admin, user.id);
     } catch {
-      return jsonResponse({ code: 'account_not_found' }, 404, origin);
+      return jsonResponse({ error: 'Unable to complete Google sign-in.' }, 500, origin);
     }
     if (!profile || (profile.role !== 'artist' && profile.role !== 'client')) {
       return jsonResponse({ code: 'account_not_found' }, 404, origin);
@@ -289,9 +392,9 @@ Deno.serve(async (request: Request) => {
 
     let stillExistingUser: Awaited<ReturnType<typeof findExistingGoogleUser>>;
     try {
-      stillExistingUser = await findExistingGoogleUser(admin, email, subject);
+      stillExistingUser = await findExistingGoogleUser(admin, subject);
     } catch {
-      return jsonResponse({ code: 'account_not_found' }, 404, origin);
+      return jsonResponse({ error: 'Unable to complete Google sign-in.' }, 500, origin);
     }
     if (!stillExistingUser || stillExistingUser.id !== user.id) {
       return jsonResponse({ code: 'account_not_found' }, 404, origin);
@@ -299,15 +402,9 @@ Deno.serve(async (request: Request) => {
 
     let confirmedProfile: { id: string; role: string } | null;
     try {
-      const result = await admin
-        .from('profiles')
-        .select('id, role')
-        .eq('id', user.id)
-        .maybeSingle();
-      if (result.error) throw result.error;
-      confirmedProfile = result.data;
+      confirmedProfile = await findProfile(admin, user.id);
     } catch {
-      return jsonResponse({ code: 'account_not_found' }, 404, origin);
+      return jsonResponse({ error: 'Unable to complete Google sign-in.' }, 500, origin);
     }
     if (!confirmedProfile || (confirmedProfile.role !== 'artist' && confirmedProfile.role !== 'client')) {
       return jsonResponse({ code: 'account_not_found' }, 404, origin);
